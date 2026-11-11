@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Зразок для ШІ. Створіть XML у цій структурі. points — максимальний бал із крапкою для дробу.
+     single: рівно один correct="1". multiple: один або більше correct="1".
+     written: без option. grading_guidance містить зразок відповіді або критерії для вчителя. -->
+<questions>
+    <question type="single" points="1">
+        <prompt>Що позначає SQL?</prompt>
+        <option correct="1">Мову структурованих запитів</option>
+        <option correct="0">Графічний формат</option>
+        <option correct="0">Тип комп’ютерної мережі</option>
+    </question>
+    <question type="multiple" points="2">
+        <prompt>Оберіть команди SQL.</prompt>
+        <option correct="1">SELECT</option>
+        <option correct="0">PRINTLN</option>
+        <option correct="1">INSERT</option>
+    </question>
+    <question type="written" points="3">
+        <prompt>Поясніть призначення первинного ключа.</prompt>
+        <grading_guidance>Первинний ключ однозначно ідентифікує рядок таблиці.</grading_guidance>
+    </question>
+</questions>
