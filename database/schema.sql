@@ -29,6 +29,7 @@ CREATE TABLE IF NOT EXISTS tests (
  previous_test_id INT UNSIGNED NULL,
  title VARCHAR(180) NOT NULL,
  status ENUM('draft','published','archived') NOT NULL DEFAULT 'draft',
+ created_at DATETIME NULL DEFAULT CURRENT_TIMESTAMP,
  published_at DATETIME NULL,
  FOREIGN KEY (subject_id) REFERENCES subjects(id),
  FOREIGN KEY (teacher_id) REFERENCES teachers(id),

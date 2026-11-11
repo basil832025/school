@@ -123,7 +123,7 @@ function teacherAction(array $teacher): never
     if ($action === 'subject') {
         query('INSERT INTO subjects (name) VALUES (?)', [textField('name', 120)]);
         $_SESSION['notice'] = 'Предмет додано.';
-        redirect('teacher.php');
+        redirect('teacher.php?section=subjects');
     }
     if ($action === 'class') {
         $grade = filter_var($_POST['grade'] ?? '', FILTER_VALIDATE_INT);
@@ -133,7 +133,7 @@ function teacherAction(array $teacher): never
         }
         query('INSERT INTO classes (grade, section) VALUES (?, ?)', [$grade, mb_strtoupper(trim($section))]);
         $_SESSION['notice'] = 'Клас додано.';
-        redirect('teacher.php');
+        redirect('teacher.php?section=classes');
     }
     db()->beginTransaction();
     try {

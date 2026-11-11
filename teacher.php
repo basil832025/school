@@ -59,14 +59,42 @@ $test = null;
 $questions = $subjects = $classes = $tests = $assigned = [];
 $editingQuestion = null;
 $testId = (int) ($_GET['test'] ?? $_POST['test_id'] ?? 0);
+$sections = ['tests' => 'Мої тести', 'new' => 'Новий тест', 'classes' => 'Класи', 'subjects' => 'Предмети'];
+$section = is_string($_GET['section'] ?? null) && isset($sections[$_GET['section']]) ? $_GET['section'] : 'tests';
+$filterClass = max(0, (int) ($_GET['class'] ?? 0));
+$filterSubject = max(0, (int) ($_GET['subject'] ?? 0));
+$sort = ($_GET['sort'] ?? '') === 'oldest' ? 'oldest' : 'newest';
+$totalTests = 0;
+$pageCount = $page = 1;
 if ($currentTeacher) {
     try {
         $subjects = query('SELECT * FROM subjects ORDER BY name')->fetchAll();
         $classes = query('SELECT * FROM classes ORDER BY grade, section')->fetchAll();
-        $tests = query('SELECT t.*, s.name AS subject_name,
-            (SELECT COUNT(*) FROM questions q WHERE q.test_id = t.id) AS question_count
-            FROM tests t JOIN subjects s ON s.id = t.subject_id WHERE t.teacher_id = ? ORDER BY t.id DESC',
-            [$currentTeacher['id']])->fetchAll();
+        if (!$testId && $section === 'tests') {
+            $where = 't.teacher_id = ?';
+            $params = [$currentTeacher['id']];
+            if ($filterClass) {
+                $where .= ' AND EXISTS (SELECT 1 FROM test_classes tc WHERE tc.test_id = t.id AND tc.class_id = ?)';
+                $params[] = $filterClass;
+            }
+            if ($filterSubject) {
+                $where .= ' AND t.subject_id = ?';
+                $params[] = $filterSubject;
+            }
+            $totalTests = (int) query("SELECT COUNT(*) FROM tests t WHERE $where", $params)->fetchColumn();
+            $pageSize = 25;
+            $pageCount = max(1, (int) ceil($totalTests / $pageSize));
+            $page = min($pageCount, max(1, (int) ($_GET['page'] ?? 1)));
+            $offset = ($page - 1) * $pageSize;
+            $direction = $sort === 'oldest' ? 'ASC' : 'DESC';
+            $tests = query("SELECT t.id, t.title, t.status, t.created_at, s.name AS subject_name,
+                (SELECT COUNT(*) FROM questions q WHERE q.test_id = t.id) AS question_count,
+                (SELECT GROUP_CONCAT(CONCAT(c.grade, IF(c.section = '', '', CONCAT('-', c.section)))
+                    ORDER BY c.grade, c.section SEPARATOR ', ')
+                    FROM test_classes tc JOIN classes c ON c.id = tc.class_id WHERE tc.test_id = t.id) AS class_names
+                FROM tests t JOIN subjects s ON s.id = t.subject_id WHERE $where
+                ORDER BY t.created_at $direction, t.id $direction LIMIT $pageSize OFFSET $offset", $params)->fetchAll();
+        }
         if ($testId) {
             $test = query('SELECT * FROM tests WHERE id = ? AND teacher_id = ?', [$testId, $currentTeacher['id']])->fetch() ?: null;
             if (!$test) {
@@ -128,27 +156,82 @@ pageStart('Кабінет учителя', 'Кабінет учителя');
 <label>Пароль<input name="password" type="password" required autocomplete="current-password"></label>
 <button>Увійти →</button></form></section>
 <?php else: ?>
-<div class="toolbar"><strong><?= e($currentTeacher['display_name']) ?></strong><a href="teacher.php">Усі тести</a>
+<div class="toolbar"><strong><?= e($currentTeacher['display_name']) ?></strong>
 <form method="post"><?= csrf() ?><button class="secondary" name="action" value="logout">Вийти</button></form></div>
-<?php if (!$test): ?>
-<div class="workspace">
-<section class="panel"><h2>Мої тести <span class="badge"><?= count($tests) ?></span></h2>
-<?php if (!$tests): ?><p class="hint">Створіть свій перший тест у формі поруч.</p><?php endif ?>
-<div class="test-list">
-<?php foreach ($tests as $item): ?>
-<a class="test-row" href="teacher.php?test=<?= $item['id'] ?>"><div><h3><?= e($item['title']) ?></h3><p class="hint"><?= e($item['subject_name']) ?> · запитань <?= $item['question_count'] ?></p></div><span class="badge"><?= $statuses[$item['status']] ?></span></a>
+<nav class="teacher-tabs" aria-label="Розділи кабінету">
+<?php foreach ($sections as $key => $label): ?>
+<a href="teacher.php<?= $key === 'tests' ? '' : '?section=' . $key ?>"
+    <?= ($test ? $key === 'tests' : $key === $section) ? 'aria-current="page"' : '' ?>><?= e($label) ?></a>
 <?php endforeach ?>
-</div></section>
-<section class="panel"><h2>Новий тест</h2>
-<?php if (!$subjects || !$classes): ?><p class="hint">Спочатку додайте предмет і клас нижче.</p><?php endif ?>
+</nav>
+<?php if (!$test): ?>
+<?php if ($section === 'tests'): ?>
+<section class="panel question-editor"><h2>Мої тести <span class="badge"><?= $totalTests ?></span></h2>
+<form method="get" action="teacher.php" class="teacher-test-filters">
+<label>Клас<select name="class"><option value="0">Усі класи</option>
+<?php foreach ($classes as $class): ?><option value="<?= e($class['id']) ?>" <?= $filterClass === (int) $class['id'] ? 'selected' : '' ?>><?= e(className($class)) ?></option><?php endforeach ?>
+</select></label>
+<label>Предмет<select name="subject"><option value="0">Усі предмети</option>
+<?php foreach ($subjects as $subject): ?><option value="<?= e($subject['id']) ?>" <?= $filterSubject === (int) $subject['id'] ? 'selected' : '' ?>><?= e($subject['name']) ?></option><?php endforeach ?>
+</select></label>
+<label>Дата додавання<select name="sort">
+<option value="newest" <?= $sort === 'newest' ? 'selected' : '' ?>>Спочатку нові</option>
+<option value="oldest" <?= $sort === 'oldest' ? 'selected' : '' ?>>Спочатку старі</option>
+</select></label>
+<button>Показати</button><a class="import-template" href="teacher.php">Скинути</a>
+</form>
+<?php if (!$tests): ?>
+<p><?= $filterClass || $filterSubject ? 'За вибраними фільтрами тестів немає.' : 'Тестів ще немає.' ?></p>
+<?php else: ?>
+<div class="results-scroll" tabindex="0" aria-label="Таблиця тестів">
+<table class="results-table teacher-tests-table">
+<thead><tr><th scope="col">Назва</th><th scope="col">Клас</th><th scope="col">Предмет</th><th scope="col">Запитань</th><th scope="col">Стан</th><th scope="col">Додано</th><th scope="col">Дії</th></tr></thead>
+<tbody>
+<?php foreach ($tests as $item): ?>
+<tr>
+<th scope="row"><a href="teacher.php?test=<?= e($item['id']) ?>"><?= e($item['title']) ?></a></th>
+<td><?= e($item['class_names'] ?? '—') ?></td>
+<td><?= e($item['subject_name']) ?></td>
+<td><?= e($item['question_count']) ?></td>
+<td><span class="badge"><?= e($statuses[$item['status']]) ?></span></td>
+<td><?= $item['created_at'] ? e(date('d.m.Y H:i', strtotime($item['created_at']))) : '—' ?></td>
+<td><?php if ($item['status'] !== 'draft'): ?><a href="results.php?test=<?= e($item['id']) ?>">Результати</a><?php else: ?><a href="teacher.php?test=<?= e($item['id']) ?>">Редагувати</a><?php endif ?></td>
+</tr>
+<?php endforeach ?>
+</tbody></table>
+</div>
+<?php if ($pageCount > 1):
+    $pagination = 'teacher.php?' . http_build_query(['class' => $filterClass, 'subject' => $filterSubject, 'sort' => $sort]);
+?>
+<nav class="toolbar" aria-label="Сторінки списку тестів">
+<?php if ($page > 1): ?><a href="<?= e($pagination . '&page=' . ($page - 1)) ?>">← Попередня</a><?php endif ?>
+<span>Сторінка <?= $page ?> з <?= $pageCount ?></span>
+<?php if ($page < $pageCount): ?><a href="<?= e($pagination . '&page=' . ($page + 1)) ?>">Наступна →</a><?php endif ?>
+</nav>
+<?php endif ?>
+<?php endif ?>
+</section>
+<?php elseif ($section === 'new'): ?>
+<section class="panel question-editor"><h2>Новий тест</h2>
+<?php if (!$subjects || !$classes): ?><p class="hint">Спочатку додайте предмет і клас у відповідних вкладках.</p><?php endif ?>
 <form method="post" class="stack"><?= csrf() ?><input type="hidden" name="action" value="create">
 <?php testFields($subjects, $classes, null, []); ?>
 <button>Створити чернетку →</button></form></section>
-</div>
+<?php elseif ($section === 'subjects'): ?>
 <div class="workspace">
+<section class="panel"><h2>Предмети</h2>
+<?php if ($subjects): ?><ul><?php foreach ($subjects as $subject): ?><li><?= e($subject['name']) ?></li><?php endforeach ?></ul>
+<?php else: ?><p>Предметів ще немає.</p><?php endif ?></section>
 <section class="panel"><h2>Додати предмет</h2><form method="post" class="stack"><?= csrf() ?><input type="hidden" name="action" value="subject"><label>Назва предмета<input name="name" required maxlength="120" placeholder="Інформатика"></label><button>Додати предмет</button></form></section>
+</div>
+<?php elseif ($section === 'classes'): ?>
+<div class="workspace">
+<section class="panel"><h2>Класи</h2>
+<?php if ($classes): ?><ul><?php foreach ($classes as $class): ?><li><?= e(className($class)) ?></li><?php endforeach ?></ul>
+<?php else: ?><p>Класів ще немає.</p><?php endif ?></section>
 <section class="panel"><h2>Додати клас</h2><form method="post" class="stack"><?= csrf() ?><input type="hidden" name="action" value="class"><label>Паралель<input type="number" name="grade" required min="1" max="12" value="8"></label><label>Літера класу<input name="section" maxlength="8" placeholder="А"></label><button>Додати клас</button></form></section>
 </div>
+<?php endif ?>
 <?php else: ?>
 <div class="toolbar"><h2><?= e($test['title']) ?></h2><span class="badge"><?= $statuses[$test['status']] ?></span></div>
 <?php if ($test['status'] !== 'draft'): ?><div class="toolbar"><a href="results.php?test=<?= $testId ?>">Результати учнів</a></div><?php endif ?>
