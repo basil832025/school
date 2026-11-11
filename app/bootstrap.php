@@ -26,12 +26,14 @@ function telegramBotUrl(): string
 }
 
 if (PHP_SAPI !== 'cli' && !defined('NO_SESSION')) {
-    $publicHost = strtolower((string) parse_url(schoolConfig()['telegram']['url'], PHP_URL_HOST));
+    $telegram = schoolConfig()['telegram'];
+    $publicHost = strtolower((string) parse_url($telegram['url'], PHP_URL_HOST));
     $host = strtolower((string) parse_url('http://' . ($_SERVER['HTTP_HOST'] ?? ''), PHP_URL_HOST));
     $forwardedHost = strtolower((string) parse_url('http://' . ($_SERVER['HTTP_X_FORWARDED_HOST'] ?? ''), PHP_URL_HOST));
     $throughTunnel = $publicHost !== '' && in_array($publicHost, [$host, $forwardedHost], true);
     $route = strtolower(basename($_SERVER['SCRIPT_FILENAME'] ?? ''));
-    if ($throughTunnel && in_array($route, ['admin.php', 'admin-students.php', 'teacher.php', 'results.php'], true)) {
+    if (($telegram['restrict_staff_on_public_url'] ?? true) && $throughTunnel
+        && in_array($route, ['admin.php', 'admin-students.php', 'teacher.php', 'results.php'], true)) {
         http_response_code(403);
         exit;
     }

@@ -12,6 +12,7 @@ return [
         'token' => '',
         'secret' => '',
         'url' => '',
+        'restrict_staff_on_public_url' => true,
     ],
     'admin' => [
         'login' => 'admin',
