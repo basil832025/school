@@ -10,6 +10,7 @@ $notice = $_SESSION['students_notice'] ?? '';
 unset($_SESSION['students_notice']);
 $students = $classes = [];
 $selectedStudent = null;
+$studentResults = [];
 $section = ($_GET['section'] ?? '') === 'merge' ? 'merge' : 'students';
 $filterClass = max(-1, (int) ($_GET['class'] ?? 0));
 $sort = is_string($_GET['sort'] ?? null) ? $_GET['sort'] : 'name';
@@ -60,6 +61,8 @@ if ($authorized) {
             $params[] = $filterClass;
         }
         $students = query("SELECT s.id, s.login, s.full_name, s.class_id, c.grade, c.section, r.phone, r.birth_year,
+            (SELECT a.grade FROM attempts a WHERE a.student_id = s.id AND a.status = 'graded'
+                ORDER BY a.submitted_at DESC, a.id DESC LIMIT 1) AS latest_grade,
             (SELECT COUNT(*) FROM attempts a WHERE a.student_id = s.id) AS attempts,
             (SELECT COUNT(*) FROM attempts a WHERE a.student_id = s.id AND a.status IN ('pending_review','graded')) AS completed
             FROM students s LEFT JOIN classes c ON c.id = s.class_id
@@ -70,6 +73,13 @@ if ($authorized) {
                 (SELECT COUNT(*) FROM attempts a WHERE a.student_id = s.id) AS attempts
                 FROM students s LEFT JOIN telegram_registrations r ON r.student_id = s.id AND r.stage = 'done' WHERE s.id = ?",
                 [$studentId])->fetch() ?: null;
+            if ($selectedStudent) {
+                $studentResults = query("SELECT t.title, c.grade AS class_grade, c.section, a.status,
+                    a.submitted_at, a.earned_points, a.max_points, a.grade
+                    FROM attempts a JOIN tests t ON t.id = a.test_id JOIN classes c ON c.id = a.class_id
+                    WHERE a.student_id = ? AND a.submitted_at IS NOT NULL
+                    ORDER BY a.submitted_at DESC, a.id DESC", [$studentId])->fetchAll();
+            }
         }
     } catch (PDOException $exception) {
         error_log((string) $exception);
@@ -181,11 +191,12 @@ pageStart('Керування учнями', 'Суперадміністрато
 <?php if (!$students): ?><p><?= $filterClass ? 'У вибраному класі немає учнів.' : 'Ще немає зареєстрованих учнів.' ?></p>
 <?php else: ?>
 <div class="results-scroll" tabindex="0" aria-label="Таблиця учнів">
-<table class="results-table"><thead><tr><th scope="col">Учень</th><th scope="col">Клас</th><th scope="col">Логін</th><th scope="col">Телефон</th><th scope="col">Рік народження</th><th scope="col">Спроб</th><th scope="col">Завершено</th><th scope="col">Дії</th></tr></thead><tbody>
+<table class="results-table"><thead><tr><th scope="col">Учень</th><th scope="col">Клас</th><th scope="col">Логін</th><th scope="col">Телефон</th><th scope="col">Рік народження</th><th scope="col">Спроб</th><th scope="col">Завершено</th><th scope="col">Остання оцінка / 12</th><th scope="col">Дії</th></tr></thead><tbody>
 <?php foreach ($students as $student): ?>
 <tr><th scope="row"><?= e($student['full_name']) ?></th><td><?= $student['class_id'] ? e(className($student)) : 'Без класу' ?></td>
 <td><?= e($student['login']) ?></td><td><?= e($student['phone'] ?? '—') ?></td><td><?= e($student['birth_year'] ?? '—') ?></td>
 <td><?= e($student['attempts']) ?></td><td><?= e($student['completed']) ?></td>
+<td><strong><?= e($student['latest_grade'] ?? '—') ?></strong></td>
 <td><div class="attempt-actions"><a class="attempt-button" href="<?= e($listUrl . '&student=' . $student['id'] . '#student-settings') ?>">Керувати</a></div></td></tr>
 <?php endforeach ?>
 </tbody></table>
@@ -196,6 +207,28 @@ pageStart('Керування учнями', 'Суперадміністрато
 <section class="panel question-editor" id="student-settings">
     <h2><?= e($student['full_name']) ?></h2>
     <p>Телефон <strong><?= e($student['phone'] ?? '—') ?></strong> · Рік народження <strong><?= e($student['birth_year'] ?? '—') ?></strong></p>
+    <?php if ($studentResults): ?>
+    <h3>Результати тестів</h3>
+    <div class="results-scroll" tabindex="0" aria-label="Результати тестів учня">
+    <table class="results-table">
+        <thead><tr><th scope="col">Тест</th><th scope="col">Клас</th><th scope="col">Дата</th><th scope="col">Бали</th><th scope="col">Оцінка / 12</th><th scope="col">Стан</th></tr></thead>
+        <tbody>
+        <?php foreach ($studentResults as $result): ?>
+        <tr><th scope="row"><?= e($result['title']) ?></th>
+        <td><?= e(className(['grade' => $result['class_grade'], 'section' => $result['section']])) ?></td>
+        <td><?= e($result['submitted_at']) ?></td>
+        <td><?= e(testPoints($result)) ?></td>
+        <td><strong><?= e($result['grade'] ?? '—') ?></strong></td>
+        <td><?= match ($result['status']) {
+            'stopped' => 'Зупинено',
+            'pending_review' => 'Очікує перевірки',
+            default => 'Оцінено',
+        } ?></td></tr>
+        <?php endforeach ?>
+        </tbody>
+    </table>
+    </div>
+    <?php endif ?>
     <form method="post" class="teacher-test-filters">
         <?= csrf() ?><input type="hidden" name="student_id" value="<?= e($student['id']) ?>">
         <label>Клас<select name="class_id" required>

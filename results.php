@@ -138,6 +138,7 @@ pageStart('Результати учнів', 'Кабінет учителя', tr
     'pending_review' => 'Очікує перевірки',
     default => 'Оцінка ' . e($attempt['grade']) . ' із 12',
 } ?></p>
+<?php if ($attempt['earned_points'] !== null): ?><p>Бали за тест <strong><?= e(testPoints($attempt)) ?></strong></p><?php endif ?>
 <?php
 $detailsLink = 'results.php?test=' . $testId . '&attempt=' . $attemptId;
 $availableActions = attemptActions($attempt['status'], $canGrantRetake && !$retakeGranted);
@@ -184,7 +185,7 @@ value="<?= e($score[$answer['id']] ?? $answer['awarded_points']) ?>"></label><?p
 <div id="live-results" class="results-scroll">
 <?php if (!$attempts): ?><p>Учні ще не почали тест.</p><?php else: ?>
 <table class="results-table">
-<thead><tr><th>Учень</th><th>Клас</th><th>Початок</th><th>Кінець</th><th>Тривалість</th><th>Відповіли</th><th>Правильно</th><th>Неправильно</th><th>Розгорнуті</th><th>Залишилось</th><th>Стан</th><th class="actions-column">Дії</th></tr></thead>
+<thead><tr><th>Учень</th><th>Клас</th><th>Початок</th><th>Кінець</th><th>Тривалість</th><th>Відповіли</th><th>Правильно</th><th>Неправильно</th><th>Розгорнуті</th><th>Залишилось</th><th>Бали</th><th>Оцінка / 12</th><th>Стан</th><th class="actions-column">Дії</th></tr></thead>
 <tbody>
 <?php foreach ($attempts as $item):
     $seconds = max(0, (int) $item['duration']);
@@ -199,11 +200,13 @@ value="<?= e($score[$answer['id']] ?? $answer['awarded_points']) ?>"></label><?p
 <td><?= e($duration) ?></td><td><?= e($item['answered']) ?> / <?= e($item['total_questions']) ?></td>
 <td class="correct-answer"><?= e($item['correct']) ?></td><td><?= e($item['incorrect']) ?></td>
 <td><?= e($item['written_count']) ?></td><td><?= max(0, $item['total_questions'] - $item['answered']) ?></td>
+<td><?= e(testPoints($item)) ?></td>
+<td><strong><?= e($item['grade'] ?? '—') ?></strong></td>
 <td><?= match ($item['status']) {
     'started' => 'Триває',
     'stopped' => 'Зупинено',
     'pending_review' => 'Очікує перевірки',
-    default => e($item['grade']) . ' із 12',
+    default => 'Оцінено',
 } ?><?php if ($item['retake_allowed'] && $item['latest']): ?><br>Повтор дозволено<?php endif ?></td>
 <td class="actions-column"><?php renderAttemptActions($detailsLink, attemptActions($item['status'], $canRetake)); ?></td>
 </tr>

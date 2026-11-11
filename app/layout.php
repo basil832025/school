@@ -18,6 +18,15 @@ function teacherSections(): array
     return ['tests' => 'Мої тести', 'new' => 'Новий тест', 'classes' => 'Класи', 'subjects' => 'Предмети'];
 }
 
+function testPoints(array $attempt): string
+{
+    if ($attempt['earned_points'] === null) {
+        return '—';
+    }
+    $format = static fn(mixed $points): string => rtrim(rtrim(number_format((float) $points, 2, ',', ''), '0'), ',');
+    return $format($attempt['earned_points']) . ' / ' . $format($attempt['max_points']);
+}
+
 function pageStart(string $title, string $section, bool $showHeader = true, ?string $teacherSection = null, ?string $adminSection = null): void
 {
     $adminLinks = [
