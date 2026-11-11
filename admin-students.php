@@ -59,14 +59,16 @@ if ($authorized) {
             $where = 'WHERE s.class_id = ?';
             $params[] = $filterClass;
         }
-        $students = query("SELECT s.id, s.login, s.full_name, s.class_id, c.grade, c.section,
+        $students = query("SELECT s.id, s.login, s.full_name, s.class_id, c.grade, c.section, r.phone, r.birth_year,
             (SELECT COUNT(*) FROM attempts a WHERE a.student_id = s.id) AS attempts,
             (SELECT COUNT(*) FROM attempts a WHERE a.student_id = s.id AND a.status IN ('pending_review','graded')) AS completed
             FROM students s LEFT JOIN classes c ON c.id = s.class_id
+            LEFT JOIN telegram_registrations r ON r.student_id = s.id AND r.stage = 'done'
             $where ORDER BY {$orders[$sort]}", $params)->fetchAll();
         if ($section === 'students' && $studentId) {
-            $selectedStudent = query('SELECT s.id, s.login, s.full_name, s.class_id,
-                (SELECT COUNT(*) FROM attempts a WHERE a.student_id = s.id) AS attempts FROM students s WHERE s.id = ?',
+            $selectedStudent = query("SELECT s.id, s.login, s.full_name, s.class_id, r.phone, r.birth_year,
+                (SELECT COUNT(*) FROM attempts a WHERE a.student_id = s.id) AS attempts
+                FROM students s LEFT JOIN telegram_registrations r ON r.student_id = s.id AND r.stage = 'done' WHERE s.id = ?",
                 [$studentId])->fetch() ?: null;
         }
     } catch (PDOException $exception) {
@@ -179,10 +181,11 @@ pageStart('Керування учнями', 'Суперадміністрато
 <?php if (!$students): ?><p><?= $filterClass ? 'У вибраному класі немає учнів.' : 'Ще немає зареєстрованих учнів.' ?></p>
 <?php else: ?>
 <div class="results-scroll" tabindex="0" aria-label="Таблиця учнів">
-<table class="results-table"><thead><tr><th scope="col">Учень</th><th scope="col">Клас</th><th scope="col">Логін</th><th scope="col">Спроб</th><th scope="col">Завершено</th><th scope="col">Дії</th></tr></thead><tbody>
+<table class="results-table"><thead><tr><th scope="col">Учень</th><th scope="col">Клас</th><th scope="col">Логін</th><th scope="col">Телефон</th><th scope="col">Рік народження</th><th scope="col">Спроб</th><th scope="col">Завершено</th><th scope="col">Дії</th></tr></thead><tbody>
 <?php foreach ($students as $student): ?>
 <tr><th scope="row"><?= e($student['full_name']) ?></th><td><?= $student['class_id'] ? e(className($student)) : 'Без класу' ?></td>
-<td><?= e($student['login']) ?></td><td><?= e($student['attempts']) ?></td><td><?= e($student['completed']) ?></td>
+<td><?= e($student['login']) ?></td><td><?= e($student['phone'] ?? '—') ?></td><td><?= e($student['birth_year'] ?? '—') ?></td>
+<td><?= e($student['attempts']) ?></td><td><?= e($student['completed']) ?></td>
 <td><div class="attempt-actions"><a class="attempt-button" href="<?= e($listUrl . '&student=' . $student['id'] . '#student-settings') ?>">Керувати</a></div></td></tr>
 <?php endforeach ?>
 </tbody></table>
@@ -192,6 +195,7 @@ pageStart('Керування учнями', 'Суперадміністрато
 <?php if ($selectedStudent): $student = $selectedStudent; ?>
 <section class="panel question-editor" id="student-settings">
     <h2><?= e($student['full_name']) ?></h2>
+    <p>Телефон <strong><?= e($student['phone'] ?? '—') ?></strong> · Рік народження <strong><?= e($student['birth_year'] ?? '—') ?></strong></p>
     <form method="post" class="teacher-test-filters">
         <?= csrf() ?><input type="hidden" name="student_id" value="<?= e($student['id']) ?>">
         <label>Клас<select name="class_id" required>
