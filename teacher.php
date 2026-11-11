@@ -239,6 +239,16 @@ pageStart('Кабінет учителя', 'Кабінет учителя', true
 <form method="post" class="stack"><?= csrf() ?><input type="hidden" name="action" value="save_test"><input type="hidden" name="test_id" value="<?= $testId ?>">
 <?php testFields($subjects, $classes, $test, $assigned); ?><button>Зберегти налаштування</button></form>
 <hr><form method="post" class="stack"><?= csrf() ?><input type="hidden" name="test_id" value="<?= $testId ?>"><p class="hint">Після публікації запитання та правильні відповіді фіксуються.</p><button name="action" value="publish">Опублікувати тест →</button></form>
+<hr>
+<details>
+    <summary>Видалити тест</summary>
+    <form method="post" class="stack">
+        <?= csrf() ?><input type="hidden" name="test_id" value="<?= $testId ?>">
+        <p class="hint">Чернетку та всі її запитання й варіанти відповідей буде видалено остаточно.</p>
+        <label><input type="checkbox" name="confirm" value="1" required> Підтверджую видалення тесту</label>
+        <button class="attempt-button-delete" name="action" value="delete_test">Видалити тест</button>
+    </form>
+</details>
 <?php else: ?>
 <p class="hint">Запитання та правильні відповіді зафіксовано.</p>
 <p>Класи
@@ -295,14 +305,21 @@ pageStart('Кабінет учителя', 'Кабінет учителя', true
 <section class="panel question-editor" id="question-import">
     <h2>Імпорт запитань з XML</h2>
     <p>Передайте шаблон ШІ та попросіть згенерувати запитання й відповіді в такій самій структурі. Збережіть файл у UTF-8.</p>
-    <p class="hint">До 200 запитань і 1 МБ на файл. Імпорт додає запитання в кінець тесту. Повторне завантаження додасть їх ще раз.</p>
+    <p class="hint">До 200 запитань і 1 МБ на файл. Можна додати запитання в кінець тесту або замінити всі запитання в чернетці.</p>
     <p><a class="import-template" href="assets/questions-template.xml" download>Завантажити XML-шаблон</a></p>
     <form method="post" enctype="multipart/form-data" class="stack">
         <?= csrf() ?>
-        <input type="hidden" name="action" value="import_questions">
         <input type="hidden" name="test_id" value="<?= $testId ?>">
         <label>XML-файл<input type="file" name="questions_xml" accept=".xml,text/xml,application/xml" required></label>
-        <button>Імпортувати запитання</button>
+        <button name="action" value="import_questions">Додати запитання</button>
+        <?php if ($questions): ?>
+        <details <?= ($_POST['action'] ?? '') === 'replace_questions' ? 'open' : '' ?>>
+            <summary>Замінити всі запитання</summary>
+            <p class="hint">Після перевірки XML усі попередні запитання й варіанти відповідей буде замінено. Назва, предмет і класи залишаться.</p>
+            <label><input type="checkbox" name="confirm_replace" value="1"> Підтверджую заміну всіх запитань</label>
+            <button class="attempt-button-delete" name="action" value="replace_questions">Імпортувати із заміною</button>
+        </details>
+        <?php endif ?>
     </form>
 </section>
 <?php endif ?>

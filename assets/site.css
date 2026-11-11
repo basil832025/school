@@ -121,8 +121,8 @@ textarea { width: 100%; min-height: 74px; resize: vertical; }
     white-space: nowrap;
 }
 .attempt-actions .attempt-button:hover { background: #dfd6f6; }
-.attempt-actions .attempt-button-delete { background: #fbe8e8; border-color: #f0c7cd; color: #8b2634; }
-.attempt-actions .attempt-button-delete:hover { background: #f6d5da; }
+.attempt-actions .attempt-button-delete, button.attempt-button-delete { background: #fbe8e8; border-color: #f0c7cd; color: #8b2634; }
+.attempt-actions .attempt-button-delete:hover, button.attempt-button-delete:hover { background: #f6d5da; }
 .form-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 220px), 1fr)); gap: 10px; }
 .option-row { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: 8px; margin-bottom: 8px; }
 .teacher hr { border: 0; border-top: 1px solid var(--border); margin: 16px 0; }

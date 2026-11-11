@@ -112,6 +112,12 @@ function insertQuestion(int $testId, int $position, array $data): void
     saveQuestionOptions((int) db()->lastInsertId(), $options);
 }
 
+function deleteTestQuestions(int $testId): void
+{
+    query('DELETE o FROM question_options o JOIN questions q ON q.id = o.question_id WHERE q.test_id = ?', [$testId]);
+    query('DELETE FROM questions WHERE test_id = ?', [$testId]);
+}
+
 function teacherAction(array $teacher): never
 {
     $action = $_POST['action'] ?? '';
@@ -189,8 +195,15 @@ function teacherAction(array $teacher): never
                         }
                         break;
                     case 'import_questions':
+                    case 'replace_questions':
+                        if ($action === 'replace_questions' && ($_POST['confirm_replace'] ?? '') !== '1') {
+                            throw new DomainException('Підтвердьте заміну всіх запитань у чернетці.');
+                        }
                         require_once __DIR__ . '/question_import.php';
                         $imported = readQuestionImport();
+                        if ($action === 'replace_questions') {
+                            deleteTestQuestions($testId);
+                        }
                         $lastPosition = (int) query('SELECT COALESCE(MAX(position), 0) FROM questions WHERE test_id = ?', [$testId])->fetchColumn();
                         if ($lastPosition + count($imported) > 65535) {
                             throw new DomainException('У тесті недостатньо місця для цих запитань.');
@@ -206,6 +219,18 @@ function teacherAction(array $teacher): never
                         }
                         query('DELETE FROM question_options WHERE question_id = ?', [$questionId]);
                         query('DELETE FROM questions WHERE id = ?', [$questionId]);
+                        break;
+                    case 'delete_test':
+                        if (($_POST['confirm'] ?? '') !== '1') {
+                            throw new DomainException('Підтвердьте видалення тесту.');
+                        }
+                        if (query('SELECT id FROM attempts WHERE test_id = ? LIMIT 1', [$testId])->fetchColumn()
+                            || query('SELECT id FROM tests WHERE previous_test_id = ? LIMIT 1', [$testId])->fetchColumn()) {
+                            throw new DomainException('Чернетку не можна видалити, бо вона має спроби або пов’язані версії.');
+                        }
+                        deleteTestQuestions($testId);
+                        query('DELETE FROM test_classes WHERE test_id = ?', [$testId]);
+                        query('DELETE FROM tests WHERE id = ?', [$testId]);
                         break;
                     case 'publish':
                         $questions = query('SELECT * FROM questions WHERE test_id = ?', [$testId])->fetchAll();
@@ -238,8 +263,10 @@ function teacherAction(array $teacher): never
         'publish' => 'Тест опубліковано. Запитання та правильні відповіді зафіксовано.',
         'archive' => 'Тест перенесено до архіву.',
         'delete_question' => 'Запитання видалено.',
+        'delete_test' => 'Чернетку тесту видалено.',
         'import_questions' => 'Імпортовано запитань: ' . count($imported) . '.',
+        'replace_questions' => 'Запитання замінено. Імпортовано: ' . count($imported) . '.',
         default => 'Зміни збережено.',
     };
-    redirect('teacher.php?test=' . $testId);
+    redirect($action === 'delete_test' ? 'teacher.php' : 'teacher.php?test=' . $testId);
 }
