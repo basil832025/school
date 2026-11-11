@@ -25,7 +25,8 @@ if (questionType) {
         correct.value = index;
         correct.checked = false;
         row.querySelector('details').open = false;
-        row.querySelector('input[type="url"]').value = '';
+        row.querySelector('[data-image-url]').value = '';
+        row.querySelector('input[type="file"]').value = '';
         row.querySelector('select').value = 'medium';
         for (const input of row.querySelectorAll('[name]')) {
             input.name = input.name.replace(/\[\d+\]/, `[${index}]`);

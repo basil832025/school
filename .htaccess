@@ -2,6 +2,7 @@ Options -Indexes
 RewriteEngine On
 RewriteRule ^(?:app|database)(?:/|$) - [F,L,NC]
 RewriteRule ^config(?:\.example)?\.php(?:/|$) - [F,L,NC]
+RewriteRule ^uploads/(?!question-images/[a-f0-9]{32}\.(?:png|jpg|webp|gif)$) - [F,L,NC]
 <FilesMatch "\.(md|sql)$">
     Require all denied
 </FilesMatch>

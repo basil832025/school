@@ -32,12 +32,77 @@ function imageData(mixed $url, mixed $size): array
         throw new DomainException('Невірні налаштування зображення.');
     }
     $url = trim($url);
-    if ($url !== '' && (strlen($url) > 2048 || !filter_var($url, FILTER_VALIDATE_URL)
+    $local = preg_match('~^uploads/question-images/[a-f0-9]{32}\.(png|jpg|webp|gif)$~D', $url)
+        && is_file(dirname(__DIR__) . '/' . $url);
+    if ($url !== '' && !$local && (strlen($url) > 2048 || !filter_var($url, FILTER_VALIDATE_URL)
         || strtolower((string) parse_url($url, PHP_URL_SCHEME)) !== 'https'
         || parse_url($url, PHP_URL_USER) !== null)) {
-        throw new DomainException('Вкажіть пряме HTTPS-посилання на зображення до 2048 символів.');
+        throw new DomainException('Вкажіть пряме HTTPS-посилання або завантажте зображення з пристрою.');
     }
     return [$url === '' ? null : $url, $size];
+}
+
+function uploadQuestionImage(mixed $error, mixed $temporary, array &$uploadedPaths): ?string
+{
+    if ($error === UPLOAD_ERR_NO_FILE) {
+        return null;
+    }
+    if ($error !== UPLOAD_ERR_OK || !is_string($temporary) || !is_uploaded_file($temporary)) {
+        throw new DomainException('Не вдалося завантажити файл. Перевірте розмір і обмеження хостингу.');
+    }
+    if (filesize($temporary) > 5 * 1024 * 1024) {
+        throw new DomainException('Розмір зображення має бути до 5 МБ.');
+    }
+    $image = @getimagesize($temporary);
+    $extensions = [IMAGETYPE_PNG => 'png', IMAGETYPE_JPEG => 'jpg', IMAGETYPE_WEBP => 'webp', IMAGETYPE_GIF => 'gif'];
+    if (!$image || !isset($extensions[$image[2]]) || $image[0] < 1 || $image[1] < 1
+        || $image[0] * $image[1] > 30_000_000) {
+        throw new DomainException('Виберіть зображення PNG, JPEG, WebP або GIF до 30 мегапікселів.');
+    }
+    $directory = dirname(__DIR__) . '/uploads/question-images';
+    if (!is_dir($directory) && !@mkdir($directory, 0755, true) && !is_dir($directory)) {
+        throw new DomainException('Не вдалося створити папку для зображень. Перевірте права на запис.');
+    }
+    $filename = bin2hex(random_bytes(16)) . '.' . $extensions[$image[2]];
+    $path = $directory . '/' . $filename;
+    if (!@move_uploaded_file($temporary, $path)) {
+        throw new DomainException('Не вдалося зберегти зображення. Перевірте права на запис.');
+    }
+    $uploadedPaths[] = $path;
+    @chmod($path, 0644);
+    return 'uploads/question-images/' . $filename;
+}
+
+function questionFormData(array &$uploadedPaths): array
+{
+    $fields = $_POST;
+    $questionFile = $_FILES['question_image_file'] ?? [];
+    $url = uploadQuestionImage($questionFile['error'] ?? UPLOAD_ERR_NO_FILE, $questionFile['tmp_name'] ?? null, $uploadedPaths);
+    if ($url !== null) {
+        $fields['image_url'] = $url;
+    }
+    if (($fields['type'] ?? '') === 'written') {
+        return $fields;
+    }
+    $optionFiles = $_FILES['option_image_file'] ?? [];
+    $errors = $optionFiles['error'] ?? [];
+    $temporaryNames = $optionFiles['tmp_name'] ?? [];
+    $labels = $fields['options'] ?? [];
+    $urls = $fields['option_image_url'] ?? [];
+    if (!is_array($errors) || count($errors) > 30 || !is_array($temporaryNames) || !is_array($labels) || !is_array($urls)) {
+        throw new DomainException('Некоректні файли варіантів відповіді.');
+    }
+    foreach ($errors as $index => $error) {
+        if (!array_key_exists($index, $labels)) {
+            throw new DomainException('Для зображення не знайдено варіант відповіді.');
+        }
+        $url = uploadQuestionImage($error, $temporaryNames[$index] ?? null, $uploadedPaths);
+        if ($url !== null) {
+            $urls[$index] = $url;
+        }
+    }
+    $fields['option_image_url'] = $urls;
+    return $fields;
 }
 
 function questionData(array $fields): array
@@ -141,6 +206,7 @@ function teacherAction(array $teacher): never
         $_SESSION['notice'] = 'Клас додано.';
         redirect('teacher.php?section=classes');
     }
+    $uploadedPaths = [];
     db()->beginTransaction();
     try {
         if ($action === 'create') {
@@ -178,7 +244,7 @@ function teacherAction(array $teacher): never
                         saveTestClasses($testId, $classes);
                         break;
                     case 'save_question':
-                        $data = questionData($_POST);
+                        $data = questionData(questionFormData($uploadedPaths));
                         [$prompt, $type, $points, $guidance, $options, $imageUrl, $imageSize] = $data;
                         $questionId = (int) ($_POST['question_id'] ?? 0);
                         if ($questionId) {
@@ -256,6 +322,9 @@ function teacherAction(array $teacher): never
     } catch (Throwable $error) {
         if (db()->inTransaction()) {
             db()->rollBack();
+        }
+        foreach ($uploadedPaths as $path) {
+            @unlink($path);
         }
         throw $error;
     }

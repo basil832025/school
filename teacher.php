@@ -284,10 +284,10 @@ pageStart('Кабінет учителя', 'Кабінет учителя', true
     }
 ?>
 <section class="panel question-editor" id="question-editor"><h2><?= ($formQuestion['id'] ?? $formQuestion['question_id'] ?? 0) ? 'Редагування запитання' : 'Нове запитання' ?></h2>
-<form method="post" class="stack"><?= csrf() ?><input type="hidden" name="action" value="save_question"><input type="hidden" name="test_id" value="<?= $testId ?>"><input type="hidden" name="question_id" value="<?= (int) ($formQuestion['id'] ?? $formQuestion['question_id'] ?? 0) ?>">
+<form method="post" enctype="multipart/form-data" class="stack"><?= csrf() ?><input type="hidden" name="action" value="save_question"><input type="hidden" name="test_id" value="<?= $testId ?>"><input type="hidden" name="question_id" value="<?= (int) ($formQuestion['id'] ?? $formQuestion['question_id'] ?? 0) ?>">
 <label>Текст запитання<textarea name="prompt" required maxlength="10000"><?= e($formQuestion['prompt'] ?? '') ?></textarea></label>
 <details <?= !empty($formQuestion['image_url']) ? 'open' : '' ?>><summary>Зображення до запитання</summary>
-<?php imageFields('image_url', 'image_size', $formQuestion['image_url'] ?? '', $formQuestion['image_size'] ?? 'medium'); ?>
+<?php imageFields('question_image_file', 'image_url', 'image_size', $formQuestion['image_url'] ?? '', $formQuestion['image_size'] ?? 'medium'); ?>
 </details>
 <div class="form-grid"><label>Тип запитання<select name="type" id="question-type"><?php foreach ($types as $type => $label): ?><option value="<?= $type ?>" <?= ($formQuestion['type'] ?? 'single') === $type ? 'selected' : '' ?>><?= $label ?></option><?php endforeach ?></select></label>
 <label>Максимум балів<input type="number" name="max_points" min="0.01" max="999999.99" step="0.01" required value="<?= e($formQuestion['max_points'] ?? '1') ?>"></label></div>
@@ -295,7 +295,7 @@ pageStart('Кабінет учителя', 'Кабінет учителя', true
 <?php for ($i = 0; $i < min(30, max(4, count($formOptions))); $i++): ?>
 <div class="option-row"><input type="text" name="options[<?= $i ?>]" maxlength="2000" aria-label="Варіант <?= $i + 1 ?>" placeholder="Варіант <?= $i + 1 ?>" value="<?= e($formOptions[$i] ?? '') ?>"><label><input type="checkbox" name="correct[]" value="<?= $i ?>" <?= in_array((string) $i, $formCorrect, true) ? 'checked' : '' ?>> Правильна</label>
 <details class="option-image-fields" <?= !empty($formImages[$i]) ? 'open' : '' ?>><summary>Зображення до варіанта</summary>
-<?php imageFields("option_image_url[$i]", "option_image_size[$i]", $formImages[$i] ?? '', $formSizes[$i] ?? 'medium'); ?>
+<?php imageFields("option_image_file[$i]", "option_image_url[$i]", "option_image_size[$i]", $formImages[$i] ?? '', $formSizes[$i] ?? 'medium'); ?>
 </details></div>
 <?php endfor ?>
 </div><button type="button" class="secondary" id="add-option">+ Додати варіант</button></div>
@@ -328,12 +328,15 @@ pageStart('Кабінет учителя', 'Кабінет учителя', true
 </main><script src="assets/teacher.js" defer></script></body></html>
 
 <?php
-function imageFields(string $urlName, string $sizeName, mixed $url, mixed $size): void
+function imageFields(string $fileName, string $urlName, string $sizeName, mixed $url, mixed $size): void
 {
     ?>
     <div class="form-grid">
-    <label>HTTPS-посилання на зображення
-        <input type="url" name="<?= e($urlName) ?>" maxlength="2048" placeholder="https://…" value="<?= e($url) ?>">
+    <label>Завантажити зображення
+        <input type="file" name="<?= e($fileName) ?>" accept="image/png,image/jpeg,image/webp,image/gif">
+    </label>
+    <label>Або посилання на зображення
+        <input type="text" data-image-url name="<?= e($urlName) ?>" maxlength="2048" placeholder="https://…" value="<?= e($url) ?>">
     </label>
     <label>Розмір<select name="<?= e($sizeName) ?>">
         <?php foreach (['small' => 'Малий', 'medium' => 'Середній', 'large' => 'Великий'] as $value => $label): ?>
@@ -341,5 +344,6 @@ function imageFields(string $urlName, string $sizeName, mixed $url, mixed $size)
         <?php endforeach ?>
     </select></label>
     </div>
+    <p class="hint">PNG, JPEG, WebP або GIF до 5 МБ. Вибраний файл замінить попереднє зображення. Щоб прибрати зображення, очистьте поле посилання.</p>
     <?php
 }
