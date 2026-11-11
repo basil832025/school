@@ -66,7 +66,7 @@ try {
     }
     $catalog = query("SELECT t.id, t.title, s.id AS subject_id, s.name AS subject_name,
         c.id AS class_id, c.grade, c.section,
-        a.status AS attempt_status, a.grade, p.test_id IS NOT NULL AS retake_allowed,
+        a.status AS attempt_status, a.grade AS attempt_grade, p.test_id IS NOT NULL AS retake_allowed,
         (SELECT COUNT(*) FROM questions q WHERE q.test_id = t.id) AS question_count
         FROM tests t JOIN subjects s ON s.id = t.subject_id
         JOIN test_classes tc ON tc.test_id = t.id JOIN classes c ON c.id = tc.class_id
@@ -130,7 +130,7 @@ function testActionLabel(array $test): string
 function testResultLabel(array $test): string
 {
     return match ($test['attempt_status']) {
-        'graded' => 'Оцінка ' . $test['grade'] . ' із 12',
+        'graded' => 'Оцінка ' . $test['attempt_grade'] . ' із 12',
         'pending_review' => 'Очікує перевірки вчителем',
         'stopped' => 'Спробу зупинено вчителем',
         default => '',
