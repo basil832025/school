@@ -45,7 +45,7 @@ function currentStudent(): ?array
     if (empty($_SESSION['student_id'])) {
         return null;
     }
-    $student = query('SELECT id, login, full_name, password_hash FROM students WHERE id = ?', [$_SESSION['student_id']])->fetch();
+    $student = query('SELECT id, login, full_name, password_hash, class_id FROM students WHERE id = ?', [$_SESSION['student_id']])->fetch();
     if (!$student || !hash_equals(hash('sha256', $student['password_hash']), $_SESSION['student_password_version'] ?? '')) {
         unset($_SESSION['student_id'], $_SESSION['student_password_version']);
         return null;
@@ -58,7 +58,10 @@ function startTest(int $testId, int $classId, array $student): never
 {
     db()->beginTransaction();
     try {
-        query('SELECT id FROM students WHERE id = ? FOR UPDATE', [$student['id']])->fetch();
+        $classAssignment = query('SELECT class_id FROM students WHERE id = ? FOR UPDATE', [$student['id']])->fetch();
+        if (!$classAssignment || ($classAssignment['class_id'] && (int) $classAssignment['class_id'] !== $classId)) {
+            throw new DomainException('Цей тест недоступний для твого класу.');
+        }
         $maximum = query("SELECT SUM(q.max_points) FROM tests t JOIN test_classes tc ON tc.test_id = t.id
             JOIN questions q ON q.test_id = t.id WHERE t.id = ? AND tc.class_id = ? AND t.status = 'published'",
             [$testId, $classId])->fetchColumn();

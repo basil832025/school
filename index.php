@@ -21,13 +21,16 @@ $miniApp = !empty($_SESSION['telegram_mini_app']);
 $registeredClass = null;
 try {
     $student = currentStudent();
-    if ($miniApp && $student) {
-        $registeredClass = query("SELECT c.id, c.grade, c.section FROM telegram_registrations r
-            JOIN classes c ON c.id = r.class_id WHERE r.student_id = ? AND r.stage = 'done'", [$student['id']])->fetch();
+    if (!empty($student['class_id'])) {
+        $registeredClass = query('SELECT id, grade, section FROM classes WHERE id = ?', [$student['class_id']])->fetch();
     }
-    $restrictedClassId = $miniApp ? (int) ($registeredClass['id'] ?? -1) : 0;
-    if ($miniApp) {
+    $restrictedClassId = (int) ($registeredClass['id'] ?? ($miniApp ? -1 : 0));
+    if ($restrictedClassId) {
         $filterClass = $restrictedClassId;
+    }
+    if ($attemptId && $student) {
+        $attempt = query("SELECT student_name FROM attempts WHERE id = ? AND test_id = ? AND class_id = ?
+            AND student_id = ? AND status = 'started'", [$attemptId, $testId, $classId, $student['id']])->fetch();
     }
     if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         try {
@@ -38,7 +41,8 @@ try {
                 }
                 redirect('student-account.php');
             }
-            if ($miniApp && $classId !== $restrictedClassId) {
+            if ($restrictedClassId && $classId !== $restrictedClassId
+                && (!$attempt || ($_POST['action'] ?? '') === 'start')) {
                 throw new DomainException('Цей тест недоступний для твого класу.');
             }
             if (($_POST['action'] ?? '') === 'start') {
@@ -60,10 +64,6 @@ try {
             $error = $exception->getMessage();
         }
     }
-    if ($attemptId && $student && (!$miniApp || $classId === $restrictedClassId)) {
-        $attempt = query("SELECT student_name FROM attempts WHERE id = ? AND test_id = ? AND class_id = ?
-            AND student_id = ? AND status = 'started'", [$attemptId, $testId, $classId, $student['id']])->fetch();
-    }
     $catalog = query("SELECT t.id, t.title, s.id AS subject_id, s.name AS subject_name,
         c.id AS class_id, c.grade, c.section,
         a.status AS attempt_status, a.grade AS attempt_grade, p.test_id IS NOT NULL AS retake_allowed,
@@ -75,12 +75,15 @@ try {
             ORDER BY (recent.status = 'started') DESC, recent.id DESC LIMIT 1
         )
         LEFT JOIN retake_permissions p ON p.student_id = ? AND p.test_id = t.id
-        WHERE t.status = 'published' AND (? = 0 OR c.id = ?)
+        WHERE t.status = 'published' AND (? = 0 OR c.id = ? OR (t.id = ? AND c.id = ?))
         ORDER BY c.grade, c.section, t.published_at DESC",
-        [$student['id'] ?? null, $student['id'] ?? null, $restrictedClassId, $restrictedClassId])->fetchAll();
+        [$student['id'] ?? null, $student['id'] ?? null, $restrictedClassId, $restrictedClassId,
+            $attempt ? $testId : 0, $attempt ? $classId : 0])->fetchAll();
     foreach ($catalog as $item) {
-        $classes[$item['class_id']] = className($item);
-        $subjects[$item['subject_id']] = $item['subject_name'];
+        if (!$restrictedClassId || (int) $item['class_id'] === $restrictedClassId) {
+            $classes[$item['class_id']] = className($item);
+            $subjects[$item['subject_id']] = $item['subject_name'];
+        }
         if ((int) $item['id'] === $testId && (int) $item['class_id'] === $classId) {
             $test = $item;
         }

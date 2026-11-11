@@ -18,8 +18,13 @@ function teacherSections(): array
     return ['tests' => 'Мої тести', 'new' => 'Новий тест', 'classes' => 'Класи', 'subjects' => 'Предмети'];
 }
 
-function pageStart(string $title, string $section, bool $showHeader = true, ?string $teacherSection = null): void
+function pageStart(string $title, string $section, bool $showHeader = true, ?string $teacherSection = null, ?string $adminSection = null): void
 {
+    $adminLinks = [
+        'teachers' => ['admin.php', 'Вчителі'],
+        'students' => ['admin-students.php', 'Учні'],
+        'merge' => ['admin-students.php?section=merge', 'Дублікати'],
+    ];
 ?>
 <!doctype html>
 <html lang="uk">
@@ -32,7 +37,20 @@ function pageStart(string $title, string $section, bool $showHeader = true, ?str
 <script src="assets/form-validation-uk.js" defer></script>
 </head>
 <body>
-<?php if ($showHeader && $teacherSection !== null): ?>
+<?php if ($showHeader && $adminSection !== null): ?>
+<header class="top teacher-top">
+    <a class="brand" href="admin.php">▤ <strong>Школа №165</strong></a>
+    <nav class="teacher-tabs" aria-label="Розділи суперадміністратора">
+    <?php foreach ($adminLinks as $key => [$url, $label]): ?>
+        <a href="<?= e($url) ?>" <?= $key === $adminSection ? 'aria-current="page"' : '' ?>><?= e($label) ?></a>
+    <?php endforeach ?>
+    </nav>
+    <div class="teacher-top-actions">
+        <a class="role" href="index.php">До сайту</a>
+        <form method="post" action="admin.php"><?= csrf() ?><button class="role" name="action" value="logout">Вийти</button></form>
+    </div>
+</header>
+<?php elseif ($showHeader && $teacherSection !== null): ?>
 <header class="top teacher-top">
     <a class="brand" href="teacher.php">▤ <strong>Школа №165</strong></a>
     <nav class="teacher-tabs" aria-label="Розділи кабінету вчителя">

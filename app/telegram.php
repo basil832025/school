@@ -185,10 +185,12 @@ function telegramCompleteRegistration(int $telegramId): array
             }
             query('DELETE FROM telegram_codes WHERE code_hash = ?', [$hash]);
         } else {
-            query('INSERT INTO students (login, password_hash, full_name) VALUES (?, ?, ?)',
-                ['tg_' . bin2hex(random_bytes(10)), password_hash(bin2hex(random_bytes(32)), PASSWORD_DEFAULT), $surname . ' ' . $firstName]);
+            query('INSERT INTO students (login, password_hash, full_name, class_id) VALUES (?, ?, ?, ?)',
+                ['tg_' . bin2hex(random_bytes(10)), password_hash(bin2hex(random_bytes(32)), PASSWORD_DEFAULT), $surname . ' ' . $firstName, $classId]);
             $studentId = (int) db()->lastInsertId();
         }
+        query('UPDATE students SET class_id = COALESCE(class_id, ?) WHERE id = ?', [$classId, $studentId]);
+        $classId = query('SELECT class_id FROM students WHERE id = ?', [$studentId])->fetchColumn();
         query("UPDATE telegram_registrations SET surname = ?, first_name = ?, class_id = ?, birth_year = ?,
             student_id = ?, stage = 'done' WHERE telegram_id = ?", [$surname, $firstName, $classId, $year, $studentId, $telegramId]);
     } else {

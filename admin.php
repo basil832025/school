@@ -97,18 +97,13 @@ if ($isAdmin) {
     }
 }
 
-pageStart('Суперадміністратор', 'Суперадміністратор');
+pageStart('Суперадміністратор', 'Суперадміністратор', adminSection: $isAdmin ? 'teachers' : null);
 ?>
 <main class="teacher">
 <section class="hero"><div><h1>Кабінет суперадміністратора</h1></div></section>
 <?php if ($error): ?><p class="alert error" role="alert"><?= e($error) ?></p><?php endif ?>
 <?php if ($notice): ?><p class="alert success" role="status"><?= e($notice) ?></p><?php endif ?>
 <?php if ($isAdmin): ?>
-<div class="toolbar">
-    <strong><?= e($account['display_name']) ?></strong>
-    <a href="admin-students.php">Керування учнями</a>
-    <form method="post"><?= csrf() ?><button class="secondary" name="action" value="logout">Вийти</button></form>
-</div>
 <div class="workspace">
     <section class="panel">
         <h2>Учителі</h2>

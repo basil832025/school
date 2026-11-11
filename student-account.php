@@ -130,7 +130,7 @@ pageStart('Кабінет учня', 'Кабінет учня', !$miniApp);
     $latest = !isset($seenTests[$row['test_id']]);
     $seenTests[$row['test_id']] = true;
     $link = 'index.php?test=' . $row['test_id'] . '&class=' . $row['class_id'];
-    $canOpenTest = $row['test_status'] === 'published' && (!$miniApp || (int) $row['class_id'] === (int) ($telegram['id'] ?? 0));
+    $canRetakeInClass = empty($student['class_id']) ? !$miniApp : (int) $row['class_id'] === (int) $student['class_id'];
 ?>
 <article class="question-preview">
 <h3><?= e($row['title']) ?></h3>
@@ -142,9 +142,9 @@ pageStart('Кабінет учня', 'Кабінет учня', !$miniApp);
     'pending_review' => 'Очікує перевірки вчителем',
     default => 'Оцінка ' . e($row['grade']) . ' із 12',
 } ?></p>
-<?php if ($canOpenTest && $row['status'] === 'started'): ?>
+<?php if ($row['test_status'] === 'published' && $row['status'] === 'started'): ?>
 <a class="quiz-link" href="<?= e($link . '&attempt=' . $row['id'] . '#quiz') ?>">Продовжити тест</a>
-<?php elseif ($canOpenTest && $latest && $row['retake_allowed']): ?>
+<?php elseif ($row['test_status'] === 'published' && $canRetakeInClass && $latest && $row['retake_allowed']): ?>
 <a class="quiz-link" href="<?= e($link . '#quiz') ?>">Відкрити дозволену повторну спробу</a>
 <?php endif ?>
 </article>

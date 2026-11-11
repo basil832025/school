@@ -8,7 +8,18 @@ header('Cache-Control: no-store');
 $error = '';
 $notice = $_SESSION['students_notice'] ?? '';
 unset($_SESSION['students_notice']);
-$students = [];
+$students = $classes = [];
+$selectedStudent = null;
+$section = ($_GET['section'] ?? '') === 'merge' ? 'merge' : 'students';
+$filterClass = max(-1, (int) ($_GET['class'] ?? 0));
+$sort = is_string($_GET['sort'] ?? null) ? $_GET['sort'] : 'name';
+$orders = ['name' => 's.full_name ASC, s.login ASC', 'reverse' => 's.full_name DESC, s.login ASC',
+    'class' => 'c.id IS NULL, c.grade, c.section, s.full_name, s.login'];
+if (!isset($orders[$sort])) {
+    $sort = 'name';
+}
+$listUrl = 'admin-students.php?' . http_build_query(['class' => $filterClass, 'sort' => $sort]);
+$studentId = max(0, (int) ($_GET['student'] ?? 0));
 $authorized = false;
 try {
     $account = teacher();
@@ -27,7 +38,7 @@ try {
             throw new DomainException('Оновіть сторінку та повторіть дію.');
         }
         $_SESSION['students_notice'] = manageStudent();
-        redirect('admin-students.php');
+        redirect($section === 'merge' ? 'admin-students.php?section=merge' : $listUrl);
     }
 } catch (DomainException $exception) {
     $error = $exception->getMessage();
@@ -39,10 +50,25 @@ try {
 }
 if ($authorized) {
     try {
-        $students = query("SELECT s.id, s.login, s.full_name, COUNT(a.id) AS attempts,
-            COUNT(a.submitted_at) AS completed
-            FROM students s LEFT JOIN attempts a ON a.student_id = s.id
-            GROUP BY s.id, s.login, s.full_name ORDER BY s.full_name, s.login")->fetchAll();
+        $classes = query('SELECT id, grade, section FROM classes ORDER BY grade, section')->fetchAll();
+        $where = '';
+        $params = [];
+        if ($section === 'students' && $filterClass === -1) {
+            $where = 'WHERE s.class_id IS NULL';
+        } elseif ($section === 'students' && $filterClass > 0) {
+            $where = 'WHERE s.class_id = ?';
+            $params[] = $filterClass;
+        }
+        $students = query("SELECT s.id, s.login, s.full_name, s.class_id, c.grade, c.section,
+            (SELECT COUNT(*) FROM attempts a WHERE a.student_id = s.id) AS attempts,
+            (SELECT COUNT(*) FROM attempts a WHERE a.student_id = s.id AND a.status IN ('pending_review','graded')) AS completed
+            FROM students s LEFT JOIN classes c ON c.id = s.class_id
+            $where ORDER BY {$orders[$sort]}", $params)->fetchAll();
+        if ($section === 'students' && $studentId) {
+            $selectedStudent = query('SELECT s.id, s.login, s.full_name, s.class_id,
+                (SELECT COUNT(*) FROM attempts a WHERE a.student_id = s.id) AS attempts FROM students s WHERE s.id = ?',
+                [$studentId])->fetch() ?: null;
+        }
     } catch (PDOException $exception) {
         error_log((string) $exception);
         $error = 'Не вдалося завантажити список учнів.';
@@ -69,6 +95,16 @@ function manageStudent(): string
             throw new DomainException('Обліковий запис учня не знайдено.');
         }
         switch ($action) {
+            case 'class':
+                $classId = filter_var($_POST['class_id'] ?? '', FILTER_VALIDATE_INT);
+                $class = $classId ? query('SELECT id, grade, section FROM classes WHERE id = ?', [$classId])->fetch() : null;
+                if (!$class) {
+                    throw new DomainException('Оберіть клас зі списку.');
+                }
+                query('UPDATE students SET class_id = ? WHERE id = ?', [$classId, $source]);
+                query('UPDATE telegram_registrations SET class_id = ? WHERE student_id = ?', [$classId, $source]);
+                $notice = 'Клас учня змінено на ' . className($class) . '.';
+                break;
             case 'login':
                 $login = textField('login', 80);
                 if (!preg_match('/^[A-Za-z0-9._-]{3,80}$/D', $login)) {
@@ -91,6 +127,8 @@ function manageStudent(): string
                 $notice = 'Обліковий запис без спроб видалено.';
                 break;
             case 'merge':
+                query('UPDATE students main JOIN students duplicate ON duplicate.id = ?
+                    SET main.class_id = COALESCE(main.class_id, duplicate.class_id) WHERE main.id = ?', [$source, $target]);
                 $moved = query('UPDATE attempts SET student_id = ? WHERE student_id = ?', [$target, $source])->rowCount();
                 query('INSERT INTO retake_permissions (student_id, test_id)
                     SELECT ?, original.test_id FROM retake_permissions original
@@ -100,6 +138,8 @@ function manageStudent(): string
                 if (!query('SELECT telegram_id FROM telegram_registrations WHERE student_id = ?', [$target])->fetchColumn()) {
                     query('UPDATE telegram_registrations SET student_id = ? WHERE student_id = ?', [$target, $source]);
                 }
+                query('UPDATE telegram_registrations r JOIN students s ON s.id = r.student_id
+                    SET r.class_id = s.class_id WHERE s.id = ?', [$target]);
                 query('DELETE FROM students WHERE id = ?', [$source]);
                 $notice = 'Акаунти об’єднано. Перенесено спроб: ' . $moved . '.';
                 break;
@@ -114,20 +154,52 @@ function manageStudent(): string
     }
 }
 
-pageStart('Керування учнями', 'Суперадміністратор');
+pageStart('Керування учнями', 'Суперадміністратор', adminSection: $authorized ? $section : null);
 ?>
-<main class="teacher">
+<main class="teacher teacher-wide">
 <section class="hero"><div><h1>Керування учнями</h1></div></section>
 <?php if ($error): ?><p class="alert error" role="alert"><?= e($error) ?></p><?php endif ?>
 <?php if ($notice): ?><p class="alert success" role="status"><?= e($notice) ?></p><?php endif ?>
 <?php if ($authorized): ?>
-<div class="toolbar"><a href="admin.php">До кабінету суперадміністратора</a></div>
+<?php if ($section === 'students'): ?>
 <section class="panel question-editor">
 <h2>Учні <span class="badge"><?= count($students) ?></span></h2>
-<?php if (!$students): ?><p>Ще немає зареєстрованих учнів.</p><?php endif ?>
+<form method="get" class="teacher-test-filters" action="admin-students.php">
+<label>Клас<select name="class">
+<option value="0">Усі класи</option><option value="-1" <?= $filterClass === -1 ? 'selected' : '' ?>>Без класу</option>
+<?php foreach ($classes as $class): ?><option value="<?= e($class['id']) ?>" <?= $filterClass === (int) $class['id'] ? 'selected' : '' ?>><?= e(className($class)) ?></option><?php endforeach ?>
+</select></label>
+<label>Сортування<select name="sort">
+<option value="name" <?= $sort === 'name' ? 'selected' : '' ?>>За алфавітом (А–Я)</option>
+<option value="reverse" <?= $sort === 'reverse' ? 'selected' : '' ?>>За алфавітом (Я–А)</option>
+<option value="class" <?= $sort === 'class' ? 'selected' : '' ?>>За класом</option>
+</select></label>
+<button>Показати</button><a class="import-template" href="admin-students.php">Скинути</a>
+</form>
+<?php if (!$students): ?><p><?= $filterClass ? 'У вибраному класі немає учнів.' : 'Ще немає зареєстрованих учнів.' ?></p>
+<?php else: ?>
+<div class="results-scroll" tabindex="0" aria-label="Таблиця учнів">
+<table class="results-table"><thead><tr><th scope="col">Учень</th><th scope="col">Клас</th><th scope="col">Логін</th><th scope="col">Спроб</th><th scope="col">Завершено</th><th scope="col">Дії</th></tr></thead><tbody>
 <?php foreach ($students as $student): ?>
-<details class="question-preview">
-    <summary><strong><?= e($student['full_name']) ?></strong> · <?= e($student['login']) ?> · спроб: <?= e($student['attempts']) ?>, завершено: <?= e($student['completed']) ?></summary>
+<tr><th scope="row"><?= e($student['full_name']) ?></th><td><?= $student['class_id'] ? e(className($student)) : 'Без класу' ?></td>
+<td><?= e($student['login']) ?></td><td><?= e($student['attempts']) ?></td><td><?= e($student['completed']) ?></td>
+<td><div class="attempt-actions"><a class="attempt-button" href="<?= e($listUrl . '&student=' . $student['id'] . '#student-settings') ?>">Керувати</a></div></td></tr>
+<?php endforeach ?>
+</tbody></table>
+</div>
+<?php endif ?>
+</section>
+<?php if ($selectedStudent): $student = $selectedStudent; ?>
+<section class="panel question-editor" id="student-settings">
+    <h2><?= e($student['full_name']) ?></h2>
+    <form method="post" class="teacher-test-filters">
+        <?= csrf() ?><input type="hidden" name="student_id" value="<?= e($student['id']) ?>">
+        <label>Клас<select name="class_id" required>
+        <option value="">Оберіть клас</option>
+        <?php foreach ($classes as $class): ?><option value="<?= e($class['id']) ?>" <?= (int) $student['class_id'] === (int) $class['id'] ? 'selected' : '' ?>><?= e(className($class)) ?></option><?php endforeach ?>
+        </select></label>
+        <button name="action" value="class">Зберегти клас</button>
+    </form>
     <div class="workspace">
         <form method="post" class="stack">
             <?= csrf() ?><input type="hidden" name="student_id" value="<?= e($student['id']) ?>">
@@ -149,12 +221,13 @@ pageStart('Керування учнями', 'Суперадміністрато
         <button class="secondary" name="action" value="delete">Видалити акаунт без спроб</button>
     </form>
     <?php endif ?>
-</details>
-<?php endforeach ?>
 </section>
-<?php if (count($students) >= 2): ?>
+<?php endif ?>
+<?php else: ?>
 <section class="panel question-editor">
 <h2>Об’єднати дублікати</h2>
+<?php if (count($students) < 2): ?><p>Для об’єднання потрібні два облікові записи.</p>
+<?php else: ?>
 <p>Усі спроби, відповіді, оцінки й дозволи на повторення перейдуть до основного акаунта. Після об’єднання учень входить з його логіном і паролем.</p>
 <form method="post" class="stack">
     <?= csrf() ?>
@@ -170,7 +243,9 @@ pageStart('Керування учнями', 'Суперадміністрато
     </div>
     <label><input type="checkbox" name="confirm" value="1" required> Підтверджую об’єднання</label>
     <button name="action" value="merge">Об’єднати акаунти</button>
-</form></section>
+</form>
+<?php endif ?>
+</section>
 <?php endif ?>
 <?php endif ?>
 </main>
