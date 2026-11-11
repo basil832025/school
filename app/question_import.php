@@ -22,7 +22,9 @@ function readQuestionImport(): array
             throw new DomainException('Додайте від 1 до 200 елементів <question> всередині <questions>.');
         }
         $fields = ['type' => $node->getAttribute('type'), 'max_points' => $node->hasAttribute('points') ? $node->getAttribute('points') : '1',
-            'options' => [], 'correct' => []];
+            'options' => [], 'correct' => [],
+            'image_url' => $node->getAttribute('image_url'),
+            'image_size' => $node->hasAttribute('image_size') ? $node->getAttribute('image_size') : 'medium'];
         try {
             foreach ($node->childNodes as $element) {
                 if (!$element instanceof DOMElement) {
@@ -42,13 +44,15 @@ function readQuestionImport(): array
                     case 'option':
                         $correct = $element->getAttribute('correct');
                         if ($fields['type'] === 'written' || !in_array($correct, ['0', '1'], true)
-                            || trim($element->textContent) === '') {
-                            throw new DomainException('Варіант має містити текст і correct="0" або correct="1". Для розгорнутої відповіді використовуйте <grading_guidance>.');
+                            || (trim($element->textContent) === '' && trim($element->getAttribute('image_url')) === '')) {
+                            throw new DomainException('Варіант має містити текст або зображення та correct="0" або correct="1". Для розгорнутої відповіді використовуйте <grading_guidance>.');
                         }
                         if ($correct === '1') {
                             $fields['correct'][] = (string) count($fields['options']);
                         }
                         $fields['options'][] = $element->textContent;
+                        $fields['option_image_url'][] = $element->getAttribute('image_url');
+                        $fields['option_image_size'][] = $element->hasAttribute('image_size') ? $element->getAttribute('image_size') : 'medium';
                         break;
                     default:
                         throw new DomainException('Невідомий елемент <' . $element->tagName . '>. Скористайтеся шаблоном.');

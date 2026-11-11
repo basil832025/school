@@ -1,8 +1,19 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!-- Зразок для ШІ. Створіть XML у цій структурі. points — максимальний бал із крапкою для дробу.
      single: рівно один correct="1". multiple: один або більше correct="1".
-     written: без option. grading_guidance містить зразок відповіді або критерії для вчителя. -->
+     written: без option. grading_guidance містить зразок відповіді або критерії для вчителя.
+     Для question та option можна додати image_url і image_size, як у першому запитанні.
+     Використовуйте прямі HTTPS-посилання на зображення. Розміри: small, medium, large.
+     Для варіанта лише із зображенням текст option можна залишити порожнім.
+     Амперсанд у посиланні записуйте як &amp;. -->
 <questions>
+    <question type="single" points="1"
+              image_url="https://upload.wikimedia.org/wikipedia/commons/4/47/PNG_transparency_demonstration_1.png"
+              image_size="medium">
+        <prompt>На ілюстрації показано растрове зображення PNG. На якому зображенні нижче показано логотип формату векторної графіки SVG?</prompt>
+        <option correct="1" image_url="https://upload.wikimedia.org/wikipedia/commons/0/02/SVG_logo.svg" image_size="small"/>
+        <option correct="0" image_url="https://upload.wikimedia.org/wikipedia/commons/a/a9/Example.jpg" image_size="small"/>
+    </question>
     <question type="single" points="1">
         <prompt>Що позначає SQL?</prompt>
         <option correct="1">Мову структурованих запитів</option>

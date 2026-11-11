@@ -5,7 +5,7 @@ function testQuestions(int $testId): array
 {
     $questions = query('SELECT * FROM questions WHERE test_id = ? ORDER BY position', [$testId])->fetchAll();
     foreach ($questions as &$question) {
-        $question['options'] = query('SELECT id, label, is_correct FROM question_options WHERE question_id = ? ORDER BY position',
+        $question['options'] = query('SELECT * FROM question_options WHERE question_id = ? ORDER BY position',
             [$question['id']])->fetchAll();
     }
     return $questions;

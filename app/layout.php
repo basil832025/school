@@ -1,6 +1,18 @@
 <?php
 declare(strict_types=1);
 
+function questionImage(array $item, string $alt): void
+{
+    if (empty($item['image_url'])) {
+        return;
+    }
+    $size = $item['image_size'] ?? 'medium';
+    ?>
+    <img class="question-image question-image-<?= e($size) ?>" src="<?= e($item['image_url']) ?>"
+         alt="<?= e($alt) ?>" referrerpolicy="no-referrer">
+    <?php
+}
+
 function pageStart(string $title, string $section, bool $showHeader = true): void
 {
 ?>
@@ -11,6 +23,7 @@ function pageStart(string $title, string $section, bool $showHeader = true): voi
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title><?= htmlspecialchars($title) ?> · Школа №165</title>
 <link rel="stylesheet" href="assets/site.css">
+<link rel="stylesheet" href="assets/question-images.css">
 <script src="assets/form-validation-uk.js" defer></script>
 </head>
 <body>

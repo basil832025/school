@@ -8,6 +8,7 @@ declare(strict_types=1);
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title><?= e($test['title']) ?> · Школа №165</title>
 <link rel="stylesheet" href="assets/print.css">
+<link rel="stylesheet" href="assets/question-images.css">
 </head>
 <body>
 <nav aria-label="Дії з документом">
@@ -22,11 +23,13 @@ declare(strict_types=1);
     <?php foreach ($questions as $index => $question): ?>
     <section>
         <h2><?= $index + 1 ?>. <?= nl2br(e($question['prompt'])) ?></h2>
+        <?php questionImage($question, 'Ілюстрація до запитання'); ?>
         <p><?= $types[$question['type']] ?> · <?= e($question['max_points']) ?> б.</p>
         <?php if ($question['options']): ?>
         <ol type="a">
             <?php foreach ($question['options'] as $option): ?>
-            <li><?= e($option['label']) ?><?= $showAnswers && $option['is_correct'] ? ' — правильно' : '' ?></li>
+            <li><?= e($option['label']) ?><?= $showAnswers && $option['is_correct'] ? ' — правильно' : '' ?>
+            <?php questionImage($option, 'Зображення варіанта відповіді'); ?></li>
             <?php endforeach ?>
         </ol>
         <?php elseif (!$showAnswers && $question['type'] === 'written'): ?>

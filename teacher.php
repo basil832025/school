@@ -175,7 +175,9 @@ pageStart('Кабінет учителя', 'Кабінет учителя');
 <?php if (!$questions): ?><p class="hint">Додайте перше запитання нижче.</p><?php endif ?>
 <?php foreach ($questions as $index => $question): ?>
 <article class="question-preview"><h3><?= $index + 1 ?>. <?= nl2br(e($question['prompt'])) ?></h3><p class="hint"><?= $types[$question['type']] ?> · <?= e($question['max_points']) ?> балів</p>
-<?php foreach ($question['options'] as $option): ?><p class="<?= $option['is_correct'] ? 'correct-answer' : '' ?>"><?= $option['is_correct'] ? '✓ ' : '○ ' ?><?= e($option['label']) ?></p><?php endforeach ?>
+<?php questionImage($question, 'Ілюстрація до запитання'); ?>
+<?php foreach ($question['options'] as $option): ?><p class="<?= $option['is_correct'] ? 'correct-answer' : '' ?>"><?= $option['is_correct'] ? '✓ ' : '○ ' ?><?= e($option['label']) ?></p>
+<?php questionImage($option, 'Зображення варіанта відповіді'); endforeach ?>
 <?php if ($question['grading_guidance']): ?><p class="hint">Для перевірки — <?= nl2br(e($question['grading_guidance'])) ?></p><?php endif ?>
 <?php if ($test['status'] === 'draft'): ?><div class="toolbar"><a class="text-link" href="teacher.php?test=<?= $testId ?>&question=<?= $question['id'] ?>#question-editor">Редагувати</a><form method="post"><?= csrf() ?><input type="hidden" name="test_id" value="<?= $testId ?>"><input type="hidden" name="question_id" value="<?= $question['id'] ?>"><button class="secondary" name="action" value="delete_question">Видалити</button></form></div><?php endif ?>
 </article><?php endforeach ?>
@@ -184,6 +186,10 @@ pageStart('Кабінет учителя', 'Кабінет учителя');
     $retry = $_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'save_question';
     $formQuestion = $retry ? $_POST : ($editingQuestion ?? []);
     $formOptions = $retry && is_array($_POST['options'] ?? null) ? $_POST['options'] : array_column($editingQuestion['options'] ?? [], 'label');
+    $formImages = $retry && is_array($_POST['option_image_url'] ?? null)
+        ? $_POST['option_image_url'] : array_column($editingQuestion['options'] ?? [], 'image_url');
+    $formSizes = $retry && is_array($_POST['option_image_size'] ?? null)
+        ? $_POST['option_image_size'] : array_column($editingQuestion['options'] ?? [], 'image_size');
     $formCorrect = $retry && is_array($_POST['correct'] ?? null)
         ? array_map('strval', array_filter($_POST['correct'], 'is_string')) : [];
     if (!$retry && $editingQuestion) {
@@ -195,11 +201,17 @@ pageStart('Кабінет учителя', 'Кабінет учителя');
 <section class="panel question-editor" id="question-editor"><h2><?= ($formQuestion['id'] ?? $formQuestion['question_id'] ?? 0) ? 'Редагування запитання' : 'Нове запитання' ?></h2>
 <form method="post" class="stack"><?= csrf() ?><input type="hidden" name="action" value="save_question"><input type="hidden" name="test_id" value="<?= $testId ?>"><input type="hidden" name="question_id" value="<?= (int) ($formQuestion['id'] ?? $formQuestion['question_id'] ?? 0) ?>">
 <label>Текст запитання<textarea name="prompt" required maxlength="10000"><?= e($formQuestion['prompt'] ?? '') ?></textarea></label>
+<details <?= !empty($formQuestion['image_url']) ? 'open' : '' ?>><summary>Зображення до запитання</summary>
+<?php imageFields('image_url', 'image_size', $formQuestion['image_url'] ?? '', $formQuestion['image_size'] ?? 'medium'); ?>
+</details>
 <div class="form-grid"><label>Тип запитання<select name="type" id="question-type"><?php foreach ($types as $type => $label): ?><option value="<?= $type ?>" <?= ($formQuestion['type'] ?? 'single') === $type ? 'selected' : '' ?>><?= $label ?></option><?php endforeach ?></select></label>
 <label>Максимум балів<input type="number" name="max_points" min="0.01" max="999999.99" step="0.01" required value="<?= e($formQuestion['max_points'] ?? '1') ?>"></label></div>
-<div id="answer-options"><p class="hint">Заповніть щонайменше два варіанти й позначте правильні. Порожні рядки пропускаються.</p><div id="option-rows">
+<div id="answer-options"><p class="hint">Додайте щонайменше два варіанти з текстом або зображенням і позначте правильні.</p><div id="option-rows">
 <?php for ($i = 0; $i < min(30, max(4, count($formOptions))); $i++): ?>
-<div class="option-row"><input type="text" name="options[<?= $i ?>]" maxlength="2000" aria-label="Варіант <?= $i + 1 ?>" placeholder="Варіант <?= $i + 1 ?>" value="<?= e($formOptions[$i] ?? '') ?>"><label><input type="checkbox" name="correct[]" value="<?= $i ?>" <?= in_array((string) $i, $formCorrect, true) ? 'checked' : '' ?>> Правильна</label></div>
+<div class="option-row"><input type="text" name="options[<?= $i ?>]" maxlength="2000" aria-label="Варіант <?= $i + 1 ?>" placeholder="Варіант <?= $i + 1 ?>" value="<?= e($formOptions[$i] ?? '') ?>"><label><input type="checkbox" name="correct[]" value="<?= $i ?>" <?= in_array((string) $i, $formCorrect, true) ? 'checked' : '' ?>> Правильна</label>
+<details class="option-image-fields" <?= !empty($formImages[$i]) ? 'open' : '' ?>><summary>Зображення до варіанта</summary>
+<?php imageFields("option_image_url[$i]", "option_image_size[$i]", $formImages[$i] ?? '', $formSizes[$i] ?? 'medium'); ?>
+</details></div>
 <?php endfor ?>
 </div><button type="button" class="secondary" id="add-option">+ Додати варіант</button></div>
 <label>Орієнтир для перевірки вчителем<textarea name="grading_guidance" maxlength="10000" placeholder="Очікувана відповідь або критерії оцінювання"><?= e($formQuestion['grading_guidance'] ?? '') ?></textarea></label>
@@ -222,3 +234,20 @@ pageStart('Кабінет учителя', 'Кабінет учителя');
 <?php endif ?>
 <?php endif ?>
 </main><script src="assets/teacher.js" defer></script></body></html>
+
+<?php
+function imageFields(string $urlName, string $sizeName, mixed $url, mixed $size): void
+{
+    ?>
+    <div class="form-grid">
+    <label>HTTPS-посилання на зображення
+        <input type="url" name="<?= e($urlName) ?>" maxlength="2048" placeholder="https://…" value="<?= e($url) ?>">
+    </label>
+    <label>Розмір<select name="<?= e($sizeName) ?>">
+        <?php foreach (['small' => 'Малий', 'medium' => 'Середній', 'large' => 'Великий'] as $value => $label): ?>
+        <option value="<?= $value ?>" <?= $size === $value ? 'selected' : '' ?>><?= $label ?></option>
+        <?php endforeach ?>
+    </select></label>
+    </div>
+    <?php
+}

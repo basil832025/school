@@ -222,13 +222,15 @@ pageStart('Онлайн-тестування', 'Тестування учнів'
     $answer = $_SERVER['REQUEST_METHOD'] === 'POST' ? ($_POST['answers'][$id] ?? null) : ($savedAnswers[$id] ?? null);
 ?>
 <fieldset data-question="<?= e($id) ?>"><legend><?= $index + 1 ?>. <?= e($question['prompt']) ?></legend>
+<?php questionImage($question, 'Ілюстрація до запитання'); ?>
 <?php if ($question['type'] === 'written'): ?>
 <textarea name="answers[<?= e($id) ?>]" aria-label="Розгорнута відповідь" required maxlength="10000"><?= e($answer) ?></textarea>
 <?php else: $multiple = $question['type'] === 'multiple'; ?>
 <?php if ($multiple): ?><p class="hint">Познач усі правильні варіанти.</p><?php endif ?>
 <?php foreach ($question['options'] as $option): ?>
 <label><input type="<?= $multiple ? 'checkbox' : 'radio' ?>" name="answers[<?= e($id) ?>]<?= $multiple ? '[]' : '' ?>" value="<?= e($option['id']) ?>"
-<?= !$multiple ? 'required' : '' ?> <?= in_array((string) $option['id'], (array) $answer, true) ? 'checked' : '' ?>> <?= e($option['label']) ?></label>
+<?= !$multiple ? 'required' : '' ?> <?= in_array((string) $option['id'], (array) $answer, true) ? 'checked' : '' ?>>
+<span><?= e($option['label']) ?><?php questionImage($option, 'Зображення варіанта відповіді'); ?></span></label>
 <?php endforeach ?>
 <?php endif ?>
 </fieldset>

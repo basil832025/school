@@ -52,6 +52,8 @@ CREATE TABLE IF NOT EXISTS questions (
  max_points DECIMAL(8,2) UNSIGNED NOT NULL DEFAULT 1,
  position SMALLINT UNSIGNED NOT NULL,
  grading_guidance TEXT NULL,
+ image_url VARCHAR(2048) NULL,
+ image_size ENUM('small','medium','large') NOT NULL DEFAULT 'medium',
  UNIQUE (test_id, position),
  FOREIGN KEY (test_id) REFERENCES tests(id)
 ) ENGINE=InnoDB;
@@ -60,6 +62,8 @@ CREATE TABLE IF NOT EXISTS question_options (
  id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
  question_id INT UNSIGNED NOT NULL,
  label TEXT NOT NULL,
+ image_url VARCHAR(2048) NULL,
+ image_size ENUM('small','medium','large') NOT NULL DEFAULT 'medium',
  is_correct BOOLEAN NOT NULL DEFAULT FALSE,
  position SMALLINT UNSIGNED NOT NULL,
  UNIQUE (question_id, position),

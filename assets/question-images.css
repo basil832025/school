@@ -1,0 +1,18 @@
+.question-image {
+    display: block;
+    width: auto;
+    max-width: min(100%, var(--image-width, 360px));
+    max-height: 420px;
+    height: auto;
+    object-fit: contain;
+    margin: 8px 0;
+    border-radius: 6px;
+}
+.question-image-small { --image-width: 160px; }
+.question-image-medium { --image-width: 360px; }
+.question-image-large { --image-width: 640px; }
+.option-image-fields { grid-column: 1 / -1; }
+.option-image-fields[open] { margin-bottom: 8px; }
+@media print {
+    .question-image { max-height: 110mm; break-inside: avoid; }
+}

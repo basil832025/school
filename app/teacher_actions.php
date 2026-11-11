@@ -26,6 +26,20 @@ function saveTestClasses(int $testId, array $classes): void
     }
 }
 
+function imageData(mixed $url, mixed $size): array
+{
+    if (!is_string($url) || !is_string($size) || !in_array($size, ['small', 'medium', 'large'], true)) {
+        throw new DomainException('Невірні налаштування зображення.');
+    }
+    $url = trim($url);
+    if ($url !== '' && (strlen($url) > 2048 || !filter_var($url, FILTER_VALIDATE_URL)
+        || strtolower((string) parse_url($url, PHP_URL_SCHEME)) !== 'https'
+        || parse_url($url, PHP_URL_USER) !== null)) {
+        throw new DomainException('Вкажіть пряме HTTPS-посилання на зображення до 2048 символів.');
+    }
+    return [$url === '' ? null : $url, $size];
+}
+
 function questionData(array $fields): array
 {
     $prompt = $fields['prompt'] ?? '';
@@ -45,47 +59,56 @@ function questionData(array $fields): array
         throw new DomainException('Скоротіть підказку для перевірки до 10000 символів.');
     }
     $options = [];
+    [$imageUrl, $imageSize] = imageData($fields['image_url'] ?? '', $fields['image_size'] ?? 'medium');
     if ($type !== 'written') {
         $labels = $fields['options'] ?? [];
         $correct = $fields['correct'] ?? [];
-        if (!is_array($labels) || !is_array($correct) || count($labels) > 30) {
+        $optionImages = $fields['option_image_url'] ?? [];
+        $optionSizes = $fields['option_image_size'] ?? [];
+        if (!is_array($labels) || !is_array($correct) || !is_array($optionImages) || !is_array($optionSizes) || count($labels) > 30) {
             throw new DomainException('Дозволено від 2 до 30 варіантів.');
         }
         foreach ($correct as $index) {
-            if (!is_string($index) || !array_key_exists($index, $labels)
-                || !is_string($labels[$index]) || trim($labels[$index]) === '') {
-                throw new DomainException('Правильний варіант має містити текст.');
+            if (!is_string($index) || !array_key_exists($index, $labels)) {
+                throw new DomainException('Оберіть правильний варіант зі списку.');
             }
         }
         foreach ($labels as $index => $label) {
             if (!is_string($label) || mb_strlen($label) > 2000) {
                 throw new DomainException('Варіант відповіді має містити до 2000 символів.');
             }
-            if (trim($label) !== '') {
-                $options[] = [trim($label), in_array((string) $index, $correct, true) ? 1 : 0];
+            [$optionUrl, $optionSize] = imageData($optionImages[$index] ?? '', $optionSizes[$index] ?? 'medium');
+            $label = trim($label);
+            $isCorrect = in_array((string) $index, $correct, true);
+            if ($label === '' && $optionUrl === null) {
+                if ($isCorrect) {
+                    throw new DomainException('Правильний варіант має містити текст або зображення.');
+                }
+                continue;
             }
+            $options[] = [$label !== '' ? $label : 'Варіант ' . (count($options) + 1), (int) $isCorrect, $optionUrl, $optionSize];
         }
         $rightCount = array_sum(array_column($options, 1));
         if (count($options) < 2 || $rightCount < 1 || ($type === 'single' && $rightCount !== 1)) {
             throw new DomainException('Додайте щонайменше 2 варіанти. Для одиничного вибору позначте одну правильну відповідь, для множинного — щонайменше одну.');
         }
     }
-    return [trim($prompt), $type, $points, trim($guidance), $options];
+    return [trim($prompt), $type, $points, trim($guidance), $options, $imageUrl, $imageSize];
 }
 
 function saveQuestionOptions(int $questionId, array $options): void
 {
-    foreach ($options as $index => [$label, $correct]) {
-        query('INSERT INTO question_options (question_id, label, is_correct, position) VALUES (?, ?, ?, ?)',
-            [$questionId, $label, $correct, $index + 1]);
+    foreach ($options as $index => [$label, $correct, $imageUrl, $imageSize]) {
+        query('INSERT INTO question_options (question_id, label, is_correct, position, image_url, image_size) VALUES (?, ?, ?, ?, ?, ?)',
+            [$questionId, $label, $correct, $index + 1, $imageUrl, $imageSize]);
     }
 }
 
 function insertQuestion(int $testId, int $position, array $data): void
 {
-    [$prompt, $type, $points, $guidance, $options] = $data;
-    query('INSERT INTO questions (test_id, prompt, type, max_points, grading_guidance, position) VALUES (?, ?, ?, ?, ?, ?)',
-        [$testId, $prompt, $type, $points, $guidance, $position]);
+    [$prompt, $type, $points, $guidance, $options, $imageUrl, $imageSize] = $data;
+    query('INSERT INTO questions (test_id, prompt, type, max_points, grading_guidance, position, image_url, image_size)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?)', [$testId, $prompt, $type, $points, $guidance, $position, $imageUrl, $imageSize]);
     saveQuestionOptions((int) db()->lastInsertId(), $options);
 }
 
@@ -150,14 +173,14 @@ function teacherAction(array $teacher): never
                         break;
                     case 'save_question':
                         $data = questionData($_POST);
-                        [$prompt, $type, $points, $guidance, $options] = $data;
+                        [$prompt, $type, $points, $guidance, $options, $imageUrl, $imageSize] = $data;
                         $questionId = (int) ($_POST['question_id'] ?? 0);
                         if ($questionId) {
                             if (!query('SELECT id FROM questions WHERE id = ? AND test_id = ?', [$questionId, $testId])->fetchColumn()) {
                                 throw new DomainException('Запитання не знайдено.');
                             }
-                            query('UPDATE questions SET prompt = ?, type = ?, max_points = ?, grading_guidance = ? WHERE id = ?',
-                                [$prompt, $type, $points, $guidance, $questionId]);
+                            query('UPDATE questions SET prompt = ?, type = ?, max_points = ?, grading_guidance = ?, image_url = ?, image_size = ? WHERE id = ?',
+                                [$prompt, $type, $points, $guidance, $imageUrl, $imageSize, $questionId]);
                             query('DELETE FROM question_options WHERE question_id = ?', [$questionId]);
                             saveQuestionOptions($questionId, $options);
                         } else {
