@@ -121,7 +121,7 @@ try {
     error_log((string) $exception);
     $error = 'Не вдалося отримати або зберегти результати.';
 }
-pageStart('Результати учнів', 'Кабінет учителя');
+pageStart('Результати учнів', 'Кабінет учителя', true, !empty($account) && $account['role'] === 'teacher' ? 'tests' : null);
 ?>
 <main class="teacher teacher-wide">
 <section class="hero"><div><h1>Результати учнів</h1><p><?= e($test['title'] ?? '') ?></p></div></section>

@@ -59,7 +59,7 @@ $test = null;
 $questions = $subjects = $classes = $tests = $assigned = [];
 $editingQuestion = null;
 $testId = (int) ($_GET['test'] ?? $_POST['test_id'] ?? 0);
-$sections = ['tests' => 'Мої тести', 'new' => 'Новий тест', 'classes' => 'Класи', 'subjects' => 'Предмети'];
+$sections = teacherSections();
 $section = is_string($_GET['section'] ?? null) && isset($sections[$_GET['section']]) ? $_GET['section'] : 'tests';
 $filterClass = max(0, (int) ($_GET['class'] ?? 0));
 $filterSubject = max(0, (int) ($_GET['subject'] ?? 0));
@@ -143,7 +143,7 @@ function testFields(array $subjects, array $classes, ?array $test, array $assign
 <?php
 }
 
-pageStart('Кабінет учителя', 'Кабінет учителя');
+pageStart('Кабінет учителя', 'Кабінет учителя', true, $currentTeacher ? ($test ? 'tests' : $section) : null);
 ?>
 <main class="teacher teacher-wide">
 <section class="hero"><div><p class="eyebrow">ШКОЛА №165</p><h1>Кабінет учителя</h1><p>Створюйте тести та перевіряйте знання своїх учнів.</p></div></section>
@@ -156,14 +156,6 @@ pageStart('Кабінет учителя', 'Кабінет учителя');
 <label>Пароль<input name="password" type="password" required autocomplete="current-password"></label>
 <button>Увійти →</button></form></section>
 <?php else: ?>
-<div class="toolbar"><strong><?= e($currentTeacher['display_name']) ?></strong>
-<form method="post"><?= csrf() ?><button class="secondary" name="action" value="logout">Вийти</button></form></div>
-<nav class="teacher-tabs" aria-label="Розділи кабінету">
-<?php foreach ($sections as $key => $label): ?>
-<a href="teacher.php<?= $key === 'tests' ? '' : '?section=' . $key ?>"
-    <?= ($test ? $key === 'tests' : $key === $section) ? 'aria-current="page"' : '' ?>><?= e($label) ?></a>
-<?php endforeach ?>
-</nav>
 <?php if (!$test): ?>
 <?php if ($section === 'tests'): ?>
 <section class="panel question-editor"><h2>Мої тести <span class="badge"><?= $totalTests ?></span></h2>
