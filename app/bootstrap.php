@@ -1,10 +1,42 @@
 <?php
 declare(strict_types=1);
 
+function schoolConfig(): array
+{
+    static $config;
+    if ($config === null) {
+        $path = dirname(__DIR__) . '/config.php';
+        if (!is_file($path)) {
+            if (PHP_SAPI === 'cli') {
+                fwrite(STDERR, "Missing config.php. Copy config.example.php to config.php and configure it.\n");
+                exit(1);
+            }
+            http_response_code(503);
+            exit('Налаштування сайту відсутні.');
+        }
+        $config = require $path;
+    }
+    return $config;
+}
+
+function telegramBotUrl(): string
+{
+    $username = schoolConfig()['telegram']['username'];
+    return $username !== '' ? 'https://t.me/' . rawurlencode($username) : '';
+}
+
 if (PHP_SAPI !== 'cli' && !defined('NO_SESSION')) {
+    $publicHost = strtolower((string) parse_url(schoolConfig()['telegram']['url'], PHP_URL_HOST));
+    $host = strtolower((string) parse_url('http://' . ($_SERVER['HTTP_HOST'] ?? ''), PHP_URL_HOST));
+    $forwardedHost = strtolower((string) parse_url('http://' . ($_SERVER['HTTP_X_FORWARDED_HOST'] ?? ''), PHP_URL_HOST));
+    $throughTunnel = $publicHost !== '' && in_array($publicHost, [$host, $forwardedHost], true);
+    $route = strtolower(basename($_SERVER['SCRIPT_FILENAME'] ?? ''));
+    if ($throughTunnel && in_array($route, ['admin.php', 'admin-students.php', 'teacher.php', 'results.php'], true)) {
+        http_response_code(403);
+        exit;
+    }
     $https = !empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off';
-    $tunnelHttps = ($_SERVER['HTTP_X_FORWARDED_PROTO'] ?? '') === 'https'
-        && ($_SERVER['HTTP_X_FORWARDED_HOST'] ?? '') === 'braeden-inkiest-insistingly.ngrok-free.dev';
+    $tunnelHttps = $throughTunnel && ($_SERVER['HTTP_X_FORWARDED_PROTO'] ?? '') === 'https';
     session_name(defined('STUDENT_SESSION') ? 'school_student' : 'school_teacher');
     session_start([
         'use_strict_mode' => true,
@@ -18,10 +50,11 @@ function db(): PDO
 {
     static $connection;
     if (!$connection) {
+        $database = schoolConfig()['database'];
         $connection = new PDO(
-            getenv('SCHOOL_DB_DSN') ?: 'mysql:host=127.0.0.1;dbname=school;charset=utf8mb4',
-            getenv('SCHOOL_DB_USER') ?: 'root',
-            getenv('SCHOOL_DB_PASSWORD') ?: '',
+            $database['dsn'],
+            $database['user'],
+            $database['password'],
             [PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION, PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
              PDO::ATTR_EMULATE_PREPARES => false]
         );

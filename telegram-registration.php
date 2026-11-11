@@ -48,10 +48,10 @@ pageStart('Реєстрація учня', 'Кабінет учня');
 <?php if ($registered): ?>
 <p class="alert success" role="status" id="<?= $notified ? 'telegram-registration-complete' : 'telegram-registration-saved' ?>">Реєстрацію успішно завершено!</p>
 <?php if (!$notified): ?><p>Повернись у чат і надішли /start, щоб відкрити меню.</p><?php endif ?>
-<a class="quiz-link" href="https://t.me/KievSchool165_bot">Повернутися до бота</a>
+<?php if (telegramBotUrl() !== ''): ?><a class="quiz-link" href="<?= e(telegramBotUrl()) ?>">Повернутися до бота</a><?php endif ?>
 <?php else: ?>
 <?php if ($error): ?><p class="alert error" role="alert"><?= e($error) ?></p><?php endif ?>
-<p id="telegram-registration-help">Відкрий цю форму кнопкою в <a class="import-template" href="https://t.me/KievSchool165_bot">Telegram-боті</a>.</p>
+<p id="telegram-registration-help"><?php if (telegramBotUrl() !== ''): ?>Відкрий цю форму кнопкою в <a class="import-template" href="<?= e(telegramBotUrl()) ?>">Telegram-боті</a>.<?php else: ?>Telegram-бот ще не налаштований.<?php endif ?></p>
 <div id="telegram-registration" hidden>
 <?php if (!$classes): ?><p>Класів ще немає. Звернись до вчителя.</p><?php else: ?>
 <form method="post" class="stack">

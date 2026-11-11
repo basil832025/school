@@ -150,7 +150,7 @@ pageStart('Кабінет учня', 'Кабінет учня', !$miniApp);
 </article>
 <?php endforeach ?>
 </section>
-<?php if (!$miniApp): ?>
+<?php if (!$miniApp && telegramBotUrl() !== ''): ?>
 <section class="panel question-editor" id="telegram">
 <h2>Telegram</h2>
 <?php if ($telegram): ?><p>Кабінет прив’язано · <?= e(className($telegram)) ?></p>
@@ -158,7 +158,7 @@ pageStart('Кабінет учня', 'Кабінет учня', !$miniApp);
 <?php if ($linkCode): ?><p>Введи <code><?= e($linkCode) ?></code> у полі «Код прив’язки» у формі реєстрації бота. Код діє 5 хвилин.</p><?php endif ?>
 <form method="post" class="stack"><?= csrf() ?><button name="action" value="telegram_link">Створити код прив’язки</button></form>
 <?php endif ?>
-<p><a class="import-template" href="https://t.me/KievSchool165_bot">Відкрити @KievSchool165_bot</a></p>
+<p><a class="import-template" href="<?= e(telegramBotUrl()) ?>">Відкрити Telegram-бота</a></p>
 </section>
 <?php endif ?>
 <?php endif ?>

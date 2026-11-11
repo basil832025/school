@@ -145,7 +145,7 @@ pageStart('Онлайн-тестування', 'Тестування учнів'
 <a class="active" href="index.php">⌂　Головна</a>
 <a href="#tests">▤　Доступні тести</a>
 <a href="student-account.php">▥　Кабінет учня</a>
-<a href="https://t.me/KievSchool165_bot">↗　Telegram-бот</a>
+<?php if (telegramBotUrl() !== ''): ?><a href="<?= e(telegramBotUrl()) ?>">↗　Telegram-бот</a><?php endif ?>
 <a href="#help">ⓘ　Про систему</a>
 </nav>
 <?php endif ?>

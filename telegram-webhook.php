@@ -8,7 +8,12 @@ if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
     http_response_code(405);
     exit;
 }
-if (!hash_equals(telegramConfig()['secret'], $_SERVER['HTTP_X_TELEGRAM_BOT_API_SECRET_TOKEN'] ?? '')) {
+$config = telegramConfig();
+if ($config['secret'] === '' || $config['token'] === '' || $config['url'] === '') {
+    http_response_code(503);
+    exit;
+}
+if (!hash_equals($config['secret'], $_SERVER['HTTP_X_TELEGRAM_BOT_API_SECRET_TOKEN'] ?? '')) {
     http_response_code(403);
     exit;
 }

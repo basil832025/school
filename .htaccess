@@ -1,9 +1,7 @@
 Options -Indexes
 RewriteEngine On
 RewriteRule ^(?:app|database)(?:/|$) - [F,L,NC]
-RewriteCond %{HTTP_HOST} ^braeden-inkiest-insistingly\.ngrok-free\.dev$ [NC,OR]
-RewriteCond %{HTTP:X-Forwarded-Host} ^braeden-inkiest-insistingly\.ngrok-free\.dev$ [NC]
-RewriteRule ^(?:admin(?:-students)?|teacher|results)\.php(?:/|$) - [F,L,NC]
+RewriteRule ^config(?:\.example)?\.php(?:/|$) - [F,L,NC]
 <FilesMatch "\.(md|sql)$">
     Require all denied
 </FilesMatch>

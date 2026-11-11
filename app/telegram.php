@@ -3,7 +3,7 @@ declare(strict_types=1);
 
 function telegramConfig(): array
 {
-    return require __DIR__ . '/telegram_config.local.php';
+    return schoolConfig()['telegram'];
 }
 
 function newTelegramCode(int $studentId, string $purpose): string
@@ -126,7 +126,11 @@ function telegramWebUser(string $initData): int
     foreach ($fields as $key => $value) {
         $lines[] = $key . '=' . $value;
     }
-    $secret = hash_hmac('sha256', telegramConfig()['token'], 'WebAppData', true);
+    $token = telegramConfig()['token'];
+    if ($token === '') {
+        throw new DomainException('Вхід через Telegram не налаштовано.');
+    }
+    $secret = hash_hmac('sha256', $token, 'WebAppData', true);
     if (!preg_match('/^[a-f0-9]{64}$/D', $hash)
         || !hash_equals(hash_hmac('sha256', implode("\n", $lines), $secret), $hash)) {
         throw new DomainException('Не вдалося перевірити підпис Telegram.');
