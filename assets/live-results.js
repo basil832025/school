@@ -1,8 +1,13 @@
 const results = document.querySelector('#live-results');
 const status = document.querySelector('#live-refresh-status');
 const normalStatus = status.textContent;
+let timer;
+let refreshing = false;
 
 async function refresh() {
+    if (refreshing) return;
+    refreshing = true;
+    clearTimeout(timer);
     try {
         const response = await fetch(location.href, {cache: 'no-store'});
         if (!response.ok) throw new Error('Refresh failed');
@@ -14,8 +19,10 @@ async function refresh() {
     } catch {
         status.textContent = 'Не вдалося оновити таблицю. Повторюємо спробу.';
     } finally {
-        setTimeout(refresh, 5000);
+        refreshing = false;
+        timer = setTimeout(refresh, 5000);
     }
 }
 
-setTimeout(refresh, 5000);
+timer = setTimeout(refresh, 5000);
+document.addEventListener('quick-review-saved', refresh);

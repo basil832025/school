@@ -86,6 +86,20 @@ textarea { width: 100%; min-height: 74px; resize: vertical; }
 .teacher-results-wide .results-table td { white-space: normal; }
 .teacher-results-wide .results-table time span { display: inline-block; white-space: nowrap; }
 .teacher-results-wide .results-table th[scope="row"] { min-width: 105px; overflow-wrap: anywhere; }
+.result-student-name { display: flex; align-items: center; gap: 6px; }
+.results-table .quick-review-link { flex: none; display: grid; place-items: center; width: 32px; min-height: 36px; background: #eee9fa; border-radius: 7px; text-decoration: none; font-size: 1.1rem; }
+.results-table .quick-review-link:hover { background: #dfd6f6; }
+.quick-review-dialog { width: min(720px, calc(100% - 24px)); max-height: calc(100dvh - 24px); padding: 16px; border: 1px solid var(--border); border-radius: 13px; color: var(--ink); background: #f8f7fc; }
+.quick-review-dialog::backdrop { background: #21194188; }
+.quick-review-heading { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.quick-review-heading h2 { margin: 0; }
+.quick-review-dialog [data-quick-review] { margin-top: 12px; }
+.written-review-answer { background: #f0ecfa; border-radius: 7px; padding: 8px 10px; overflow-wrap: anywhere; }
+.quick-score { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+.quick-score label { display: inline-flex; align-items: center; gap: 6px; margin-right: 4px; }
+.quick-score input { width: 60px; text-align: center; }
+.quick-score button { min-width: 38px; }
+.quick-score button[aria-pressed="true"] { color: white; background: var(--purple); }
 .teacher-top { position: sticky; top: 0; z-index: 10; gap: 8px 24px; box-shadow: 0 2px 8px #21194122; }
 .teacher-tabs { display: flex; flex-wrap: wrap; gap: 4px; }
 .teacher-tabs a { display: inline-flex; align-items: center; justify-content: center; padding: 8px 12px; min-height: 44px; border-radius: 8px; white-space: nowrap; }

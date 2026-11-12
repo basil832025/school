@@ -7,6 +7,7 @@ header('Cache-Control: no-store');
 
 $testId = (int) ($_GET['test'] ?? 0);
 $attemptId = (int) ($_GET['attempt'] ?? 0);
+$quickReview = $attemptId > 0 && ($_GET['quick'] ?? '') === '1';
 $confirmation = $_GET['confirm'] ?? '';
 $error = '';
 $notice = $_SESSION['results_notice'] ?? '';
@@ -33,10 +34,11 @@ try {
             http_response_code(404);
             throw new DomainException('Спробу не знайдено.');
         }
-        $answers = query("SELECT a.*, q.prompt, q.max_points, q.grading_guidance, q.type
+        $answerFilter = $quickReview ? " AND q.type = 'written' AND q.max_points = 3" : '';
+        $answers = query("SELECT a.*, q.prompt, q.max_points, q.grading_guidance, q.type, q.position, q.image_url, q.image_size
             FROM attempt_answers a JOIN questions q ON q.id = a.question_id
-            WHERE a.attempt_id = ? ORDER BY q.position", [$attemptId])->fetchAll();
-        if ($attempt['student_id'] && $attempt['status'] !== 'started' && $test['status'] === 'published') {
+            WHERE a.attempt_id = ?$answerFilter ORDER BY q.position", [$attemptId])->fetchAll();
+        if (!$quickReview && $attempt['student_id'] && $attempt['status'] !== 'started' && $test['status'] === 'published') {
             $latest = query("SELECT id FROM attempts WHERE student_id = ? AND test_id = ?
                 ORDER BY (status = 'started') DESC, id DESC LIMIT 1",
                 [$attempt['student_id'], $testId])->fetchColumn();
@@ -85,6 +87,14 @@ try {
             db()->rollBack();
             throw $exception;
         }
+        if ($quickReview) {
+            if (($_POST['dialog'] ?? '') === '1') {
+                http_response_code(204);
+                exit;
+            }
+            $_SESSION['results_notice'] = 'Бали збережено.';
+            redirect('results.php?test=' . $testId);
+        }
         redirect('results.php?test=' . $testId . '&attempt=' . $attemptId);
     }
     if (!$attemptId) {
@@ -95,6 +105,7 @@ try {
             COALESCE(progress.correct, 0) AS correct,
             COALESCE(progress.incorrect, 0) AS incorrect,
             COALESCE(progress.written_count, 0) AS written_count,
+            COALESCE(progress.quick_count, 0) AS quick_count,
             a.id = (SELECT recent.id FROM attempts recent WHERE recent.student_id = a.student_id AND recent.test_id = a.test_id
                 ORDER BY (recent.status = 'started') DESC, recent.id DESC LIMIT 1) AS latest,
             EXISTS(SELECT 1 FROM retake_permissions p WHERE p.student_id = a.student_id AND p.test_id = a.test_id) AS retake_allowed
@@ -103,18 +114,21 @@ try {
                 SELECT aa.attempt_id, COUNT(*) AS answered,
                     SUM(q.type <> 'written' AND aa.awarded_points > 0) AS correct,
                     SUM(q.type <> 'written' AND aa.awarded_points = 0) AS incorrect,
-                    SUM(q.type = 'written') AS written_count
+                    SUM(q.type = 'written') AS written_count,
+                    SUM(q.type = 'written' AND q.max_points = 3) AS quick_count
                 FROM attempt_answers aa JOIN questions q ON q.id = aa.question_id
                 WHERE q.test_id = ? GROUP BY aa.attempt_id
             ) progress ON progress.attempt_id = a.id
             WHERE a.test_id = ? ORDER BY (a.status = 'started') DESC, a.started_at DESC, a.id DESC",
             [$testId, $testId])->fetchAll();
     }
-    foreach ($answers as &$answer) {
-        $answer['selected'] = query('SELECT o.label FROM attempt_answer_options ao JOIN question_options o ON o.id = ao.option_id
-            WHERE ao.answer_id = ? ORDER BY o.position', [$answer['id']])->fetchAll(PDO::FETCH_COLUMN);
+    if (!$quickReview) {
+        foreach ($answers as &$answer) {
+            $answer['selected'] = query('SELECT o.label FROM attempt_answer_options ao JOIN question_options o ON o.id = ao.option_id
+                WHERE ao.answer_id = ? ORDER BY o.position', [$answer['id']])->fetchAll(PDO::FETCH_COLUMN);
+        }
+        unset($answer);
     }
-    unset($answer);
 } catch (DomainException $exception) {
     $error = $exception->getMessage();
 } catch (PDOException $exception) {
@@ -125,11 +139,38 @@ pageStart('Результати учнів', 'Кабінет учителя', tr
 ?>
 <main class="teacher <?= $attempt ? 'teacher-wide' : 'teacher-results-wide' ?>">
 <section class="hero"><div><h1>Результати учнів</h1><p><?= e($test['title'] ?? '') ?></p></div></section>
-<?php if ($error): ?><p class="alert error" role="alert"><?= e($error) ?></p><?php endif ?>
+<?php if ($error && !$quickReview): ?><p class="alert error" role="alert"><?= e($error) ?></p><?php endif ?>
 <?php if ($notice): ?><p class="alert success" role="status"><?= e($notice) ?></p><?php endif ?>
 <?php if ($test): ?>
 <div class="toolbar"><a href="teacher.php?test=<?= $testId ?>">До тесту</a><a href="results.php?test=<?= $testId ?>">Усі спроби</a></div>
-<?php if ($attempt): ?>
+<?php if ($quickReview): ?>
+<section class="panel question-editor" data-quick-review>
+<h2><?= e($attempt['student_name'] ?? 'Швидка перевірка') ?></h2>
+<?php if ($error): ?><p class="alert error" role="alert"><?= e($error) ?></p><?php endif ?>
+<?php if ($answers && in_array($attempt['status'] ?? '', ['pending_review', 'graded'], true)): ?>
+<form method="post" class="stack" data-quick-form action="results.php?test=<?= $testId ?>&amp;attempt=<?= $attemptId ?>&amp;quick=1">
+<?= csrf() ?>
+<?php foreach ($answers as $answer): ?>
+<article class="question-preview">
+<h3><?= e($answer['position']) ?>. <?= e($answer['prompt']) ?></h3>
+<?php questionImage($answer, 'Ілюстрація до запитання'); ?>
+<p class="written-review-answer"><?= nl2br(e($answer['written_answer'])) ?></p>
+<?php if ($answer['grading_guidance']): ?><p class="hint"><?= nl2br(e($answer['grading_guidance'])) ?></p><?php endif ?>
+<div class="quick-score">
+    <label>Бал <input type="number" min="0" max="3" step="0.01" inputmode="numeric" required
+        name="points[<?= e($answer['id']) ?>]" value="<?= e($score[$answer['id']] ?? $answer['awarded_points']) ?>"></label>
+    <?php for ($points = 0; $points <= 3; $points++): ?>
+    <button type="button" class="secondary" data-score="<?= $points ?>" aria-pressed="false"><?= $points ?></button>
+    <?php endfor ?>
+</div>
+</article>
+<?php endforeach ?>
+<button>Зберегти бали</button>
+</form>
+<?php elseif (!$error): ?><p>У цій спробі немає розгорнутих відповідей на 3 бали для перевірки.</p><?php endif ?>
+</section>
+<script src="assets/quick-review.js" defer></script>
+<?php elseif ($attempt): ?>
 <section class="panel question-editor">
 <h2><?= e($attempt['student_name']) ?></h2>
 <p><?= match ($attempt['status']) {
@@ -194,7 +235,15 @@ value="<?= e($score[$answer['id']] ?? $answer['awarded_points']) ?>"></label><?p
     $canRetake = $item['latest'] && !$item['retake_allowed'] && $test['status'] === 'published';
 ?>
 <tr>
-<th scope="row"><a href="<?= e($detailsLink) ?>"><?= e($item['student_name']) ?></a></th>
+<th scope="row">
+<div class="result-student-name">
+<?php if ($item['quick_count'] && in_array($item['status'], ['pending_review', 'graded'], true)): ?>
+<a class="quick-review-link" data-quick-link href="<?= e($detailsLink . '&quick=1') ?>"
+    aria-label="Швидка перевірка: <?= e($item['student_name']) ?>" title="Швидка перевірка">✎</a>
+<?php endif ?>
+<a href="<?= e($detailsLink) ?>"><?= e($item['student_name']) ?></a>
+</div>
+</th>
 <td><?= e(className(['grade' => $item['class_grade'], 'section' => $item['section']])) ?></td>
 <td><?php renderResultTime($item['started_at']); ?></td><td><?php renderResultTime($item['submitted_at']); ?></td>
 <td><?= e($duration) ?></td><td><?= e($item['answered']) ?> / <?= e($item['total_questions']) ?></td>
@@ -214,9 +263,16 @@ value="<?= e($score[$answer['id']] ?? $answer['awarded_points']) ?>"></label><?p
 </tbody></table>
 <?php endif ?>
 </div></section>
+<dialog id="quick-review-dialog" class="quick-review-dialog" aria-labelledby="quick-review-title">
+<div class="quick-review-heading"><h2 id="quick-review-title">Швидка перевірка</h2>
+<form method="dialog"><button class="secondary" aria-label="Закрити">✕</button></form></div>
+<div id="quick-review-content"></div>
+</dialog>
+<script src="assets/quick-review.js" defer></script>
 <script src="assets/live-results.js" defer></script>
 <?php endif ?>
 <?php endif ?>
+<?php if (!$test && $quickReview): ?><p class="alert error" data-quick-review role="alert"><?= e($error) ?></p><?php endif ?>
 </main>
 </body></html>
 
