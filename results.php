@@ -123,7 +123,7 @@ try {
 }
 pageStart('Результати учнів', 'Кабінет учителя', true, !empty($account) && $account['role'] === 'teacher' ? 'tests' : null);
 ?>
-<main class="teacher teacher-wide">
+<main class="teacher <?= $attempt ? 'teacher-wide' : 'teacher-results-wide' ?>">
 <section class="hero"><div><h1>Результати учнів</h1><p><?= e($test['title'] ?? '') ?></p></div></section>
 <?php if ($error): ?><p class="alert error" role="alert"><?= e($error) ?></p><?php endif ?>
 <?php if ($notice): ?><p class="alert success" role="status"><?= e($notice) ?></p><?php endif ?>
@@ -182,7 +182,7 @@ value="<?= e($score[$answer['id']] ?? $answer['awarded_points']) ?>"></label><?p
 <section class="panel question-editor">
 <h2>Хід тестування</h2>
 <p class="hint" id="live-refresh-status">Таблиця оновлюється кожні 5 секунд. Розгорнуті відповіді показано окремо від правильних і неправильних варіантів.</p>
-<div id="live-results" class="results-scroll">
+<div id="live-results" class="results-scroll" tabindex="0" aria-label="Таблиця результатів учнів">
 <?php if (!$attempts): ?><p>Учні ще не почали тест.</p><?php else: ?>
 <table class="results-table">
 <thead><tr><th>Учень</th><th>Клас</th><th>Початок</th><th>Кінець</th><th>Тривалість</th><th>Відповіли</th><th>Правильно</th><th>Неправильно</th><th>Розгорнуті</th><th>Залишилось</th><th>Бали</th><th>Оцінка / 12</th><th>Стан</th><th class="actions-column">Дії</th></tr></thead>
@@ -196,7 +196,7 @@ value="<?= e($score[$answer['id']] ?? $answer['awarded_points']) ?>"></label><?p
 <tr>
 <th scope="row"><a href="<?= e($detailsLink) ?>"><?= e($item['student_name']) ?></a></th>
 <td><?= e(className(['grade' => $item['class_grade'], 'section' => $item['section']])) ?></td>
-<td><?= e($item['started_at']) ?></td><td><?= e($item['submitted_at'] ?? '—') ?></td>
+<td><?php renderResultTime($item['started_at']); ?></td><td><?php renderResultTime($item['submitted_at']); ?></td>
 <td><?= e($duration) ?></td><td><?= e($item['answered']) ?> / <?= e($item['total_questions']) ?></td>
 <td class="correct-answer"><?= e($item['correct']) ?></td><td><?= e($item['incorrect']) ?></td>
 <td><?= e($item['written_count']) ?></td><td><?= max(0, $item['total_questions'] - $item['answered']) ?></td>
@@ -221,6 +221,16 @@ value="<?= e($score[$answer['id']] ?? $answer['awarded_points']) ?>"></label><?p
 </body></html>
 
 <?php
+function renderResultTime(?string $timestamp): void
+{
+    if ($timestamp === null) {
+        echo '—';
+        return;
+    }
+    [$date, $time] = explode(' ', $timestamp, 2);
+    echo '<time datetime="' . e($date . 'T' . $time) . '"><span>' . e($date) . '</span> <span>' . e($time) . '</span></time>';
+}
+
 function attemptActions(string $status, bool $canRetake): array
 {
     $actions = [];

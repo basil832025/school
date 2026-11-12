@@ -41,6 +41,8 @@ textarea { width: 100%; min-height: 74px; resize: vertical; }
 .teacher { max-width: 1080px; margin: auto; }
 .teacher input { display: block; width: 100%; }
 .teacher-wide { max-width: 1200px; }
+.teacher-results-wide { max-width: none; }
+.teacher-results-wide .hero { padding-block: clamp(14px, 2vw, 24px); }
 .login-panel { max-width: 460px; margin: 20px auto; }
 .stack { display: grid; gap: 12px; }
 .stack > button, .stack > .toolbar { justify-self: start; }
@@ -81,6 +83,9 @@ textarea { width: 100%; min-height: 74px; resize: vertical; }
 .results-table td { white-space: nowrap; }
 .results-table thead { background: #eee9fa; }
 .results-table a { color: var(--purple); text-decoration: underline; }
+.teacher-results-wide .results-table td { white-space: normal; }
+.teacher-results-wide .results-table time span { display: inline-block; white-space: nowrap; }
+.teacher-results-wide .results-table th[scope="row"] { min-width: 105px; overflow-wrap: anywhere; }
 .teacher-top { position: sticky; top: 0; z-index: 10; gap: 8px 24px; box-shadow: 0 2px 8px #21194122; }
 .teacher-tabs { display: flex; flex-wrap: wrap; gap: 4px; }
 .teacher-tabs a { display: inline-flex; align-items: center; justify-content: center; padding: 8px 12px; min-height: 44px; border-radius: 8px; white-space: nowrap; }
