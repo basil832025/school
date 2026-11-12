@@ -17,6 +17,24 @@ $attempts = $answers = [];
 $canGrantRetake = false;
 $retakeGranted = false;
 $score = $_POST['points'] ?? [];
+$sortColumns = [
+    'student' => ['Учень', ['a.student_name'], 'asc'],
+    'class' => ['Клас', ['c.grade', 'c.section'], 'asc'],
+    'start' => ['Початок', ['a.started_at'], 'desc'],
+    'end' => ['Кінець', ['a.submitted_at'], 'desc', 'a.submitted_at'],
+    'duration' => ['Тривалість', ['duration'], 'desc'],
+    'answered' => ['Відповіли', ['answered'], 'desc'],
+    'correct' => ['Правильно', ['correct'], 'desc'],
+    'incorrect' => ['Неправильно', ['incorrect'], 'desc'],
+    'written' => ['Розгорнуті', ['written_count'], 'desc'],
+    'remaining' => ['Залишилось', ['(total_questions - answered)'], 'desc'],
+    'points' => ['Бали', ['a.earned_points'], 'desc', 'a.earned_points'],
+    'grade' => ['Оцінка / 12', ['a.grade'], 'desc', 'a.grade'],
+    'status' => ['Стан', ['a.status'], 'asc'],
+];
+$sort = is_string($_GET['sort'] ?? null) && isset($sortColumns[$_GET['sort']]) ? $_GET['sort'] : '';
+$direction = $sort && in_array($_GET['direction'] ?? '', ['asc', 'desc'], true)
+    ? $_GET['direction'] : ($sortColumns[$sort][2] ?? 'desc');
 try {
     $account = teacher();
     if (!$account) {
@@ -98,6 +116,16 @@ try {
         redirect('results.php?test=' . $testId . '&attempt=' . $attemptId);
     }
     if (!$attemptId) {
+        $order = "(a.status = 'started') DESC, a.started_at DESC, a.id DESC";
+        if ($sort !== '') {
+            $column = $sortColumns[$sort];
+            $sqlDirection = strtoupper($direction);
+            $order = implode(', ', array_map(static fn(string $field): string => "$field $sqlDirection", $column[1]));
+            if (isset($column[3])) {
+                $order = $column[3] . ' IS NULL ASC, ' . $order;
+            }
+            $order .= ', a.id DESC';
+        }
         $attempts = query("SELECT a.*, c.grade AS class_grade, c.section,
             TIMESTAMPDIFF(SECOND, a.started_at, COALESCE(a.submitted_at, NOW())) AS duration,
             (SELECT COUNT(*) FROM questions WHERE test_id = a.test_id) AS total_questions,
@@ -119,7 +147,7 @@ try {
                 FROM attempt_answers aa JOIN questions q ON q.id = aa.question_id
                 WHERE q.test_id = ? GROUP BY aa.attempt_id
             ) progress ON progress.attempt_id = a.id
-            WHERE a.test_id = ? ORDER BY (a.status = 'started') DESC, a.started_at DESC, a.id DESC",
+            WHERE a.test_id = ? ORDER BY $order",
             [$testId, $testId])->fetchAll();
     }
     if (!$quickReview) {
@@ -226,7 +254,18 @@ value="<?= e($score[$answer['id']] ?? $answer['awarded_points']) ?>"></label><?p
 <div id="live-results" class="results-scroll" tabindex="0" aria-label="Таблиця результатів учнів">
 <?php if (!$attempts): ?><p>Учні ще не почали тест.</p><?php else: ?>
 <table class="results-table">
-<thead><tr><th>Учень</th><th>Клас</th><th>Початок</th><th>Кінець</th><th>Тривалість</th><th>Відповіли</th><th>Правильно</th><th>Неправильно</th><th>Розгорнуті</th><th>Залишилось</th><th>Бали</th><th>Оцінка / 12</th><th>Стан</th><th class="actions-column">Дії</th></tr></thead>
+<thead><tr>
+<?php foreach ($sortColumns as $key => [$label, , $defaultDirection]):
+    $active = $sort === $key;
+    $nextDirection = $active ? ($direction === 'asc' ? 'desc' : 'asc') : $defaultDirection;
+    $sortUrl = 'results.php?' . http_build_query(['test' => $testId, 'sort' => $key, 'direction' => $nextDirection]) . '#live-results';
+?>
+<th scope="col"<?= $active ? ' aria-sort="' . ($direction === 'asc' ? 'ascending' : 'descending') . '"' : '' ?>>
+    <a class="result-sort" href="<?= e($sortUrl) ?>"><?= e($label) ?><span aria-hidden="true"><?= $active ? ($direction === 'asc' ? '↑' : '↓') : '↕' ?></span></a>
+</th>
+<?php endforeach ?>
+<th scope="col" class="actions-column">Дії</th>
+</tr></thead>
 <tbody>
 <?php foreach ($attempts as $item):
     $seconds = max(0, (int) $item['duration']);

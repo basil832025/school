@@ -61,9 +61,8 @@ $editingQuestion = null;
 $testId = (int) ($_GET['test'] ?? $_POST['test_id'] ?? 0);
 $sections = teacherSections();
 $section = is_string($_GET['section'] ?? null) && isset($sections[$_GET['section']]) ? $_GET['section'] : 'tests';
-$filterClass = max(0, (int) ($_GET['class'] ?? 0));
-$filterSubject = max(0, (int) ($_GET['subject'] ?? 0));
-$sort = ($_GET['sort'] ?? '') === 'oldest' ? 'oldest' : 'newest';
+$filterClass = $filterSubject = 0;
+$sort = 'newest';
 $totalTests = 0;
 $pageCount = $page = 1;
 if ($currentTeacher) {
@@ -71,6 +70,21 @@ if ($currentTeacher) {
         $subjects = query('SELECT * FROM subjects ORDER BY name')->fetchAll();
         $classes = query('SELECT * FROM classes ORDER BY grade, section')->fetchAll();
         if (!$testId && $section === 'tests') {
+            if (($_GET['reset_filters'] ?? '') === '1') {
+                unset($_SESSION['teacher_test_list']);
+                redirect('teacher.php');
+            }
+            $filters = $_SESSION['teacher_test_list'] ?? [];
+            if (isset($_GET['class']) || isset($_GET['subject']) || isset($_GET['sort'])) {
+                $filters = [
+                    'class' => max(0, (int) ($_GET['class'] ?? 0)),
+                    'subject' => max(0, (int) ($_GET['subject'] ?? 0)),
+                    'sort' => ($_GET['sort'] ?? '') === 'oldest' ? 'oldest' : 'newest',
+                ];
+            }
+            $filterClass = $filters['class'] ?? 0;
+            $filterSubject = $filters['subject'] ?? 0;
+            $sort = $filters['sort'] ?? 'newest';
             $where = 't.teacher_id = ?';
             $params = [$currentTeacher['id']];
             if ($filterClass) {
@@ -84,7 +98,7 @@ if ($currentTeacher) {
             $totalTests = (int) query("SELECT COUNT(*) FROM tests t WHERE $where", $params)->fetchColumn();
             $pageSize = 25;
             $pageCount = max(1, (int) ceil($totalTests / $pageSize));
-            $page = min($pageCount, max(1, (int) ($_GET['page'] ?? 1)));
+            $page = min($pageCount, max(1, (int) ($_GET['page'] ?? $filters['page'] ?? 1)));
             $offset = ($page - 1) * $pageSize;
             $direction = $sort === 'oldest' ? 'ASC' : 'DESC';
             $tests = query("SELECT t.id, t.title, t.status, t.created_at, s.name AS subject_name,
@@ -94,6 +108,7 @@ if ($currentTeacher) {
                     FROM test_classes tc JOIN classes c ON c.id = tc.class_id WHERE tc.test_id = t.id) AS class_names
                 FROM tests t JOIN subjects s ON s.id = t.subject_id WHERE $where
                 ORDER BY t.created_at $direction, t.id $direction LIMIT $pageSize OFFSET $offset", $params)->fetchAll();
+            $_SESSION['teacher_test_list'] = ['class' => $filterClass, 'subject' => $filterSubject, 'sort' => $sort, 'page' => $page];
         }
         if ($testId) {
             $test = query('SELECT * FROM tests WHERE id = ? AND teacher_id = ?', [$testId, $currentTeacher['id']])->fetch() ?: null;
@@ -170,7 +185,7 @@ pageStart('Кабінет учителя', 'Кабінет учителя', true
 <option value="newest" <?= $sort === 'newest' ? 'selected' : '' ?>>Спочатку нові</option>
 <option value="oldest" <?= $sort === 'oldest' ? 'selected' : '' ?>>Спочатку старі</option>
 </select></label>
-<button>Показати</button><a class="import-template" href="teacher.php">Скинути</a>
+<button>Показати</button><a class="import-template" href="teacher.php?reset_filters=1">Скинути</a>
 </form>
 <?php if (!$tests): ?>
 <p><?= $filterClass || $filterSubject ? 'За вибраними фільтрами тестів немає.' : 'Тестів ще немає.' ?></p>
