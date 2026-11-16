@@ -285,8 +285,8 @@ value="<?= e($score[$answer['id']] ?? $answer['awarded_points']) ?>"></label><?p
 <?php endif ?>
 <a href="<?= e($detailsLink) ?>"><?= e($item['student_name']) ?></a>
 </div>
-<?php if ($item['status'] === 'stopped' && !$item['quick_count'] && $item['grade'] === null): ?>
-<a href="<?= e($detailsLink) ?>">Оцінити</a>
+<?php if ($item['status'] === 'stopped' && $item['grade'] === null): ?>
+<div class="attempt-actions"><a class="attempt-button" href="<?= e($detailsLink) ?>">Оцінити</a></div>
 <?php endif ?>
 </th>
 <td><?= e(className(['grade' => $item['class_grade'], 'section' => $item['section']])) ?></td>
