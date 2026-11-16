@@ -67,6 +67,7 @@ textarea { width: 100%; min-height: 74px; resize: vertical; }
 .import-template { color: var(--purple); text-decoration: underline; }
 .quiz-link { display: inline-block; background: var(--purple); color: white; padding: 7px 13px; border-radius: 8px; font-weight: 650; }
 .quiz-link:hover { background: #49349a; }
+.toolbar .quiz-link { color: white; text-decoration: none; }
 .telegram-tests { max-width: 720px; margin: auto; }
 .telegram-tests .catalog, .telegram-tests .workspace { grid-template-columns: minmax(0, 1fr); }
 .telegram-tests .catalog { margin-top: 0; }
