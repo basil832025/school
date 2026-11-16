@@ -227,7 +227,12 @@ function teacherAction(array $teacher): never
                 throw new DomainException('Тест не знайдено або доступ відсутній.');
             }
             if ($action === 'archive' && $test['status'] === 'published') {
+                if (($_POST['confirm_archive'] ?? '') !== '1') {
+                    throw new DomainException('Підтвердьте перенесення тесту до архіву.');
+                }
                 query("UPDATE tests SET status = 'archived' WHERE id = ?", [$testId]);
+            } elseif ($action === 'restore' && $test['status'] === 'archived') {
+                query("UPDATE tests SET status = 'published' WHERE id = ?", [$testId]);
             } else {
                 if ($test['status'] !== 'draft') {
                     throw new DomainException('Редагувати можна лише чернетки.');
@@ -331,6 +336,7 @@ function teacherAction(array $teacher): never
     $_SESSION['notice'] = match ($action) {
         'publish' => 'Тест опубліковано. Запитання та правильні відповіді зафіксовано.',
         'archive' => 'Тест перенесено до архіву.',
+        'restore' => 'Тест відновлено з архіву. Він знову доступний учням.',
         'delete_question' => 'Запитання видалено.',
         'delete_test' => 'Чернетку тесту видалено.',
         'import_questions' => 'Імпортовано запитань: ' . count($imported) . '.',

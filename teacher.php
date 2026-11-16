@@ -268,7 +268,22 @@ pageStart('Кабінет учителя', 'Кабінет учителя', true
 <p class="hint">Запитання та правильні відповіді зафіксовано.</p>
 <p>Класи
 <?php foreach ($classes as $class) { if (in_array($class['id'], $assigned)) { echo e(className($class)) . ' '; } } ?></p>
-<?php if ($test['status'] === 'published'): ?><form method="post"><?= csrf() ?><input type="hidden" name="test_id" value="<?= $testId ?>"><button name="action" value="archive" class="secondary">Перенести до архіву</button></form><?php endif ?>
+<?php if ($test['status'] === 'published'): ?>
+<details <?= ($_POST['action'] ?? '') === 'archive' ? 'open' : '' ?>>
+    <summary>Перенести до архіву</summary>
+    <form method="post" class="stack">
+        <?= csrf() ?><input type="hidden" name="test_id" value="<?= $testId ?>">
+        <p class="hint">Тест зникне з каталогу учнів. Спроби та результати збережуться.</p>
+        <label><input type="checkbox" name="confirm_archive" value="1" required> Підтверджую архівацію тесту</label>
+        <button class="secondary" name="action" value="archive">Підтвердити архівацію</button>
+    </form>
+</details>
+<?php elseif ($test['status'] === 'archived'): ?>
+<form method="post">
+    <?= csrf() ?><input type="hidden" name="test_id" value="<?= $testId ?>">
+    <button name="action" value="restore">Відновити з архіву</button>
+</form>
+<?php endif ?>
 <?php endif ?>
 </section>
 <section class="panel"><h2>Запитання <span class="badge"><?= count($questions) ?></span></h2>
