@@ -80,7 +80,7 @@ try {
 </form>
 <?php if (!$students): ?><p>За цими фільтрами учнів немає.</p><?php else: ?>
 <div class="results-scroll" tabindex="0" aria-label="Таблиця учнів">
-<table class="results-table"><thead><tr><th>Учень</th><th>Клас</th><th>Спроб</th><th>Остання спроба</th></tr></thead><tbody>
+<table class="results-table" data-sortable="teacher-students"><thead><tr><th>Учень</th><th>Клас</th><th>Спроб</th><th>Остання спроба</th></tr></thead><tbody>
 <?php foreach ($students as $student): ?>
 <tr><th scope="row"><a href="<?= e($listUrl . '&student=' . $student['id']) ?>"><?= e($student['full_name']) ?></a></th>
 <td><?= $student['grade'] === null ? 'Без класу' : e(className($student)) ?></td>
@@ -96,7 +96,7 @@ try {
 <?= $oldest ? 'Дата ↑ · показати нові спочатку' : 'Дата ↓ · показати старі спочатку' ?></a></p>
 <?php if (!$history): ?><p>Учень ще не проходив ваших тестів.</p><?php else: ?>
 <div class="results-scroll" tabindex="0" aria-label="Історія тестів учня">
-<table class="results-table teacher-tests-table"><thead><tr><th>Тест</th><th>Предмет</th><th>Клас</th><th>Початок</th><th>Завершення</th><th>Бали</th><th>Оцінка / 12</th><th>Стан</th></tr></thead><tbody>
+<table class="results-table teacher-tests-table" data-sortable="teacher-history"><thead><tr><th>Тест</th><th>Предмет</th><th>Клас</th><th>Початок</th><th>Завершення</th><th>Бали</th><th>Оцінка / 12</th><th>Стан</th></tr></thead><tbody>
 <?php foreach ($history as $item):
     $details = 'results.php?test=' . $item['test_id'] . '&attempt=' . $item['id'];
 ?>

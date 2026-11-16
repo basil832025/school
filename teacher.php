@@ -62,7 +62,27 @@ $testId = (int) ($_GET['test'] ?? $_POST['test_id'] ?? 0);
 $sections = teacherSections();
 $section = is_string($_GET['section'] ?? null) && isset($sections[$_GET['section']]) ? $_GET['section'] : 'tests';
 $filterClass = $filterSubject = 0;
+$filterStatus = '';
+$statuses = ['draft' => 'Чернетка', 'published' => 'Опубліковано', 'archived' => 'В архіві'];
 $sort = 'newest';
+$tableColumns = [
+    'title' => ['Назва', 't.title'],
+    'class' => ['Клас', 'first_grade, first_section'],
+    'subject' => ['Предмет', 'subject_name'],
+    'questions' => ['Запитань', 'question_count'],
+    'status' => ['Стан', 't.status'],
+    'added' => ['Додано', 't.created_at'],
+    'activity' => ['Останнє проходження', 'last_completion'],
+];
+$sortOrders = ['newest' => 't.created_at DESC', 'oldest' => 't.created_at ASC',
+    'last' => 'last_completion IS NULL, last_completion DESC', 'first' => 'last_completion IS NULL, last_completion ASC'];
+foreach (array_slice($tableColumns, 0, 5, true) as $key => [, $fields]) {
+    foreach (['asc', 'desc'] as $dir) {
+        $sortOrders[$key . '_' . $dir] = implode(', ', array_map(
+            static fn(string $field): string => $field . ' ' . strtoupper($dir), explode(', ', $fields)
+        ));
+    }
+}
 $totalTests = 0;
 $pageCount = $page = 1;
 if ($currentTeacher) {
@@ -75,15 +95,18 @@ if ($currentTeacher) {
                 redirect('teacher.php');
             }
             $filters = $_SESSION['teacher_test_list'] ?? [];
-            if (isset($_GET['class']) || isset($_GET['subject']) || isset($_GET['sort'])) {
+            if (isset($_GET['class']) || isset($_GET['subject']) || isset($_GET['sort']) || isset($_GET['status'])) {
+                $requestedStatus = $_GET['status'] ?? '';
                 $filters = [
                     'class' => max(0, (int) ($_GET['class'] ?? 0)),
                     'subject' => max(0, (int) ($_GET['subject'] ?? 0)),
-                    'sort' => in_array($_GET['sort'] ?? '', ['oldest', 'last', 'first'], true) ? $_GET['sort'] : 'newest',
+                    'status' => is_string($requestedStatus) && isset($statuses[$requestedStatus]) ? $requestedStatus : '',
+                    'sort' => is_string($_GET['sort'] ?? null) && isset($sortOrders[$_GET['sort']]) ? $_GET['sort'] : 'newest',
                 ];
             }
             $filterClass = $filters['class'] ?? 0;
             $filterSubject = $filters['subject'] ?? 0;
+            $filterStatus = $filters['status'] ?? '';
             $sort = $filters['sort'] ?? 'newest';
             $where = 't.teacher_id = ?';
             $params = [$currentTeacher['id']];
@@ -95,28 +118,32 @@ if ($currentTeacher) {
                 $where .= ' AND t.subject_id = ?';
                 $params[] = $filterSubject;
             }
+            if ($filterStatus !== '') {
+                $where .= ' AND t.status = ?';
+                $params[] = $filterStatus;
+            }
             $totalTests = (int) query("SELECT COUNT(*) FROM tests t WHERE $where", $params)->fetchColumn();
             $pageSize = 25;
             $pageCount = max(1, (int) ceil($totalTests / $pageSize));
             $page = min($pageCount, max(1, (int) ($_GET['page'] ?? $filters['page'] ?? 1)));
             $offset = ($page - 1) * $pageSize;
             $activityFilter = $filterClass ? ' AND a.class_id = ?' : '';
-            $order = match ($sort) {
-                'last' => 'last_completion IS NULL, last_completion DESC, t.id DESC',
-                'first' => 'last_completion IS NULL, last_completion ASC, t.id DESC',
-                'oldest' => 't.created_at ASC, t.id ASC',
-                default => 't.created_at DESC, t.id DESC',
-            };
+            $order = $sortOrders[$sort] ?? $sortOrders['newest'];
             $tests = query("SELECT t.id, t.title, t.status, t.created_at, s.name AS subject_name,
                 (SELECT MAX(a.submitted_at) FROM attempts a WHERE a.test_id = t.id
                     AND a.status IN ('pending_review', 'graded')$activityFilter) AS last_completion,
                 (SELECT COUNT(*) FROM questions q WHERE q.test_id = t.id) AS question_count,
+                (SELECT c.grade FROM test_classes tc JOIN classes c ON c.id = tc.class_id
+                    WHERE tc.test_id = t.id ORDER BY c.grade, c.section LIMIT 1) AS first_grade,
+                (SELECT c.section FROM test_classes tc JOIN classes c ON c.id = tc.class_id
+                    WHERE tc.test_id = t.id ORDER BY c.grade, c.section LIMIT 1) AS first_section,
                 (SELECT GROUP_CONCAT(CONCAT(c.grade, IF(c.section = '', '', CONCAT('-', c.section)))
                     ORDER BY c.grade, c.section SEPARATOR ', ')
                     FROM test_classes tc JOIN classes c ON c.id = tc.class_id WHERE tc.test_id = t.id) AS class_names
                 FROM tests t JOIN subjects s ON s.id = t.subject_id WHERE $where
-                ORDER BY $order LIMIT $pageSize OFFSET $offset", $filterClass ? [$filterClass, ...$params] : $params)->fetchAll();
-            $_SESSION['teacher_test_list'] = ['class' => $filterClass, 'subject' => $filterSubject, 'sort' => $sort, 'page' => $page];
+                ORDER BY $order, t.id DESC LIMIT $pageSize OFFSET $offset", $filterClass ? [$filterClass, ...$params] : $params)->fetchAll();
+            $_SESSION['teacher_test_list'] = ['class' => $filterClass, 'subject' => $filterSubject, 'status' => $filterStatus,
+                'sort' => $sort, 'page' => $page];
         }
         if ($testId) {
             $test = query('SELECT * FROM tests WHERE id = ? AND teacher_id = ?', [$testId, $currentTeacher['id']])->fetch() ?: null;
@@ -140,7 +167,6 @@ if ($currentTeacher) {
         $error = 'Не вдалося завантажити кабінет. Перевірте підключення до бази.';
     }
 }
-$statuses = ['draft' => 'Чернетка', 'published' => 'Опубліковано', 'archived' => 'В архіві'];
 $types = ['single' => 'Одна правильна відповідь', 'multiple' => 'Кілька правильних відповідей', 'written' => 'Розгорнута відповідь'];
 
 if ($test && in_array($_GET['print'] ?? '', ['student', 'teacher'], true)) {
@@ -189,20 +215,42 @@ pageStart('Кабінет учителя', 'Кабінет учителя', true
 <label>Предмет<select name="subject"><option value="0">Усі предмети</option>
 <?php foreach ($subjects as $subject): ?><option value="<?= e($subject['id']) ?>" <?= $filterSubject === (int) $subject['id'] ? 'selected' : '' ?>><?= e($subject['name']) ?></option><?php endforeach ?>
 </select></label>
+<label>Стан<select name="status"><option value="">Усі стани</option>
+<?php foreach ($statuses as $value => $label): ?>
+<option value="<?= e($value) ?>" <?= $filterStatus === $value ? 'selected' : '' ?>><?= e($label) ?></option>
+<?php endforeach ?>
+</select></label>
 <label>Сортування<select name="sort">
 <option value="newest" <?= $sort === 'newest' ? 'selected' : '' ?>>Спочатку нові</option>
 <option value="oldest" <?= $sort === 'oldest' ? 'selected' : '' ?>>Спочатку старі</option>
 <option value="last" <?= $sort === 'last' ? 'selected' : '' ?>>Останнє проходження ↓</option>
 <option value="first" <?= $sort === 'first' ? 'selected' : '' ?>>Останнє проходження ↑</option>
+<?php foreach (array_slice($tableColumns, 0, 5, true) as $key => [$label]): ?>
+<option value="<?= $key ?>_asc" <?= $sort === $key . '_asc' ? 'selected' : '' ?>><?= e($label) ?> ↑</option>
+<option value="<?= $key ?>_desc" <?= $sort === $key . '_desc' ? 'selected' : '' ?>><?= e($label) ?> ↓</option>
+<?php endforeach ?>
 </select></label>
 <button>Показати</button><a class="import-template" href="teacher.php?reset_filters=1">Скинути</a>
 </form>
 <?php if (!$tests): ?>
-<p><?= $filterClass || $filterSubject ? 'За вибраними фільтрами тестів немає.' : 'Тестів ще немає.' ?></p>
+<p><?= $filterClass || $filterSubject || $filterStatus !== '' ? 'За вибраними фільтрами тестів немає.' : 'Тестів ще немає.' ?></p>
 <?php else: ?>
 <div class="results-scroll" tabindex="0" aria-label="Таблиця тестів">
 <table class="results-table teacher-tests-table">
-<thead><tr><th scope="col">Назва</th><th scope="col">Клас</th><th scope="col">Предмет</th><th scope="col">Запитань</th><th scope="col">Стан</th><th scope="col">Додано</th><th scope="col">Останнє проходження</th><th scope="col">Дії</th></tr></thead>
+<thead><tr>
+<?php foreach ($tableColumns as $key => [$label]):
+    [$asc, $desc] = match ($key) {
+        'added' => ['oldest', 'newest'],
+        'activity' => ['first', 'last'],
+        default => [$key . '_asc', $key . '_desc'],
+    };
+    $active = $sort === $asc ? 'ascending' : ($sort === $desc ? 'descending' : '');
+    $next = !$active && in_array($key, ['added', 'activity'], true) ? $desc : ($sort === $asc ? $desc : $asc);
+    $sortUrl = 'teacher.php?' . http_build_query(['class' => $filterClass, 'subject' => $filterSubject, 'status' => $filterStatus, 'sort' => $next]);
+?>
+<th scope="col"<?= $active ? ' aria-sort="' . $active . '"' : '' ?>><a class="result-sort" href="<?= e($sortUrl) ?>"><?= e($label) ?><span aria-hidden="true"><?= $active === 'ascending' ? '↑' : ($active === 'descending' ? '↓' : '↕') ?></span></a></th>
+<?php endforeach ?>
+<th scope="col">Дії</th></tr></thead>
 <tbody>
 <?php foreach ($tests as $item): ?>
 <tr>
@@ -219,7 +267,7 @@ pageStart('Кабінет учителя', 'Кабінет учителя', true
 </tbody></table>
 </div>
 <?php if ($pageCount > 1):
-    $pagination = 'teacher.php?' . http_build_query(['class' => $filterClass, 'subject' => $filterSubject, 'sort' => $sort]);
+    $pagination = 'teacher.php?' . http_build_query(['class' => $filterClass, 'subject' => $filterSubject, 'status' => $filterStatus, 'sort' => $sort]);
 ?>
 <nav class="toolbar" aria-label="Сторінки списку тестів">
 <?php if ($page > 1): ?><a href="<?= e($pagination . '&page=' . ($page - 1)) ?>">← Попередня</a><?php endif ?>

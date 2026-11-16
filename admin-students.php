@@ -195,7 +195,7 @@ pageStart('Керування учнями', 'Суперадміністрато
 <?php if (!$students): ?><p><?= $filterClass ? 'У вибраному класі немає учнів.' : 'Ще немає зареєстрованих учнів.' ?></p>
 <?php else: ?>
 <div class="results-scroll" tabindex="0" aria-label="Таблиця учнів">
-<table class="results-table"><thead><tr><th scope="col">Учень</th><th scope="col">Клас</th><th scope="col">Логін</th><th scope="col">Телефон</th><th scope="col">Рік народження</th><th scope="col">Спроб</th><th scope="col">Завершено</th><th scope="col">Остання оцінка / 12</th><th scope="col">Дії</th></tr></thead><tbody>
+<table class="results-table" data-sortable="admin-students"><thead><tr><th scope="col">Учень</th><th scope="col">Клас</th><th scope="col">Логін</th><th scope="col">Телефон</th><th scope="col">Рік народження</th><th scope="col">Спроб</th><th scope="col">Завершено</th><th scope="col">Остання оцінка / 12</th><th scope="col" data-no-sort>Дії</th></tr></thead><tbody>
 <?php foreach ($students as $student): ?>
 <tr><th scope="row"><?= e($student['full_name']) ?></th><td><?= $student['class_id'] ? e(className($student)) : 'Без класу' ?></td>
 <td><?= e($student['login']) ?></td><td><?= e($student['phone'] ?? studentPhoneLogin($student['login']) ?? '—') ?></td><td><?= e($student['birth_year'] ?? '—') ?></td>
@@ -214,7 +214,7 @@ pageStart('Керування учнями', 'Суперадміністрато
     <?php if ($studentResults): ?>
     <h3>Результати тестів</h3>
     <div class="results-scroll" tabindex="0" aria-label="Результати тестів учня">
-    <table class="results-table">
+    <table class="results-table" data-sortable="admin-history">
         <thead><tr><th scope="col">Тест</th><th scope="col">Клас</th><th scope="col">Дата</th><th scope="col">Бали</th><th scope="col">Оцінка / 12</th><th scope="col">Стан</th></tr></thead>
         <tbody>
         <?php foreach ($studentResults as $result): ?>

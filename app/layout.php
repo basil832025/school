@@ -44,6 +44,7 @@ function pageStart(string $title, string $section, bool $showHeader = true, ?str
 <link rel="stylesheet" href="assets/site.css">
 <link rel="stylesheet" href="assets/question-images.css">
 <script src="assets/form-validation-uk.js" defer></script>
+<script src="assets/table-sort.js" defer></script>
 </head>
 <body>
 <?php if ($showHeader && $adminSection !== null): ?>
