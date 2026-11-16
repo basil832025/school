@@ -17,6 +17,7 @@ $attempts = $answers = [];
 $canGrantRetake = false;
 $retakeGranted = false;
 $score = $_POST['points'] ?? [];
+$gradableStatuses = ['pending_review', 'graded', 'stopped'];
 $sortColumns = [
     'student' => ['Учень', ['a.student_name'], 'asc'],
     'class' => ['Клас', ['c.grade', 'c.section'], 'asc'],
@@ -81,13 +82,14 @@ try {
             redirect('results.php?test=' . $testId);
         }
         $written = array_filter($answers, static fn(array $answer): bool => $answer['type'] === 'written');
-        if (!$attempt || !in_array($attempt['status'], ['pending_review', 'graded'], true) || !$written || !is_array($score)) {
+        if (!$attempt || !in_array($attempt['status'], $gradableStatuses, true)
+            || (!$written && ($quickReview || $attempt['status'] !== 'stopped')) || !is_array($score)) {
             throw new DomainException('Немає розгорнутих відповідей для перевірки.');
         }
         db()->beginTransaction();
         try {
             $status = query('SELECT status FROM attempts WHERE id = ? AND test_id = ? FOR UPDATE', [$attemptId, $testId])->fetchColumn();
-            if (!in_array($status, ['pending_review', 'graded'], true)) {
+            if (!in_array($status, $gradableStatuses, true)) {
                 throw new DomainException('Ця спроба більше недоступна для оцінювання.');
             }
             foreach ($written as $answer) {
@@ -175,7 +177,7 @@ pageStart('Результати учнів', 'Кабінет учителя', tr
 <section class="panel question-editor" data-quick-review>
 <h2><?= e($attempt['student_name'] ?? 'Швидка перевірка') ?></h2>
 <?php if ($error): ?><p class="alert error" role="alert"><?= e($error) ?></p><?php endif ?>
-<?php if ($answers && in_array($attempt['status'] ?? '', ['pending_review', 'graded'], true)): ?>
+<?php if ($answers && in_array($attempt['status'] ?? '', $gradableStatuses, true)): ?>
 <form method="post" class="stack" data-quick-form action="results.php?test=<?= $testId ?>&amp;attempt=<?= $attemptId ?>&amp;quick=1">
 <?= csrf() ?>
 <?php foreach ($answers as $answer): ?>
@@ -203,7 +205,7 @@ pageStart('Результати учнів', 'Кабінет учителя', tr
 <h2><?= e($attempt['student_name']) ?></h2>
 <p><?= match ($attempt['status']) {
     'started' => 'Триває',
-    'stopped' => 'Зупинено вчителем',
+    'stopped' => 'Зупинено вчителем' . ($attempt['grade'] !== null ? ' · Оцінка ' . e($attempt['grade']) . ' із 12' : ''),
     'pending_review' => 'Очікує перевірки',
     default => 'Оцінка ' . e($attempt['grade']) . ' із 12',
 } ?></p>
@@ -216,7 +218,7 @@ $availableActions = attemptActions($attempt['status'], $canGrantRetake && !$reta
 <div class="alert <?= $confirmation === 'delete' ? 'error' : 'success' ?>">
 <h3><?= e($availableActions[$confirmation]) ?>?</h3>
 <p><?= match ($confirmation) {
-    'stop' => 'Учень більше не зможе продовжити цю спробу. Введені відповіді збережуться без оцінки.',
+    'stop' => 'Учень більше не зможе продовжити цю спробу. Збережені відповіді можна буде оцінити.',
     'grant_retake' => 'Учень отримає одну додаткову спробу. Попередні результати збережуться.',
     'delete' => 'Спробу, відповіді та оцінку буде видалено остаточно. Якщо це єдина спроба, учень зможе почати тест знову.',
 } ?></p>
@@ -228,8 +230,9 @@ $availableActions = attemptActions($attempt['status'], $canGrantRetake && !$reta
 <?php if ($retakeGranted): ?><p class="result">Дозволено одну повторну спробу.</p><?php endif ?>
 <?php renderAttemptActions($detailsLink, $availableActions); ?>
 <?php endif ?>
-<form method="post" class="stack"><?= csrf() ?>
-<?php $hasWritten = false; $canGrade = in_array($attempt['status'], ['pending_review', 'graded'], true);
+<?php if ($attempt['status'] === 'stopped'): ?><p class="hint">За пропущені запитання нараховується 0 балів.</p><?php endif ?>
+<form method="post" class="stack" action="<?= e($detailsLink) ?>"><?= csrf() ?>
+<?php $hasWritten = false; $canGrade = in_array($attempt['status'], $gradableStatuses, true);
 foreach ($answers as $index => $answer): ?>
 <article class="question-preview">
 <h3><?= $index + 1 ?>. <?= e($answer['prompt']) ?></h3>
@@ -245,7 +248,7 @@ value="<?= e($score[$answer['id']] ?? $answer['awarded_points']) ?>"></label><?p
 <?php endif ?>
 </article>
 <?php endforeach ?>
-<?php if ($hasWritten): ?><button>Зберегти оцінку</button><?php endif ?>
+<?php if ($hasWritten || $attempt['status'] === 'stopped'): ?><button>Зберегти оцінку</button><?php endif ?>
 </form></section>
 <?php else: ?>
 <section class="panel question-editor">
@@ -276,12 +279,15 @@ value="<?= e($score[$answer['id']] ?? $answer['awarded_points']) ?>"></label><?p
 <tr>
 <th scope="row">
 <div class="result-student-name">
-<?php if ($item['quick_count'] && in_array($item['status'], ['pending_review', 'graded'], true)): ?>
+<?php if ($item['quick_count'] && in_array($item['status'], $gradableStatuses, true)): ?>
 <a class="quick-review-link" data-quick-link href="<?= e($detailsLink . '&quick=1') ?>"
     aria-label="Швидка перевірка: <?= e($item['student_name']) ?>" title="Швидка перевірка">✎</a>
 <?php endif ?>
 <a href="<?= e($detailsLink) ?>"><?= e($item['student_name']) ?></a>
 </div>
+<?php if ($item['status'] === 'stopped' && !$item['quick_count'] && $item['grade'] === null): ?>
+<a href="<?= e($detailsLink) ?>">Оцінити</a>
+<?php endif ?>
 </th>
 <td><?= e(className(['grade' => $item['class_grade'], 'section' => $item['section']])) ?></td>
 <td><?php renderResultTime($item['started_at']); ?></td><td><?php renderResultTime($item['submitted_at']); ?></td>

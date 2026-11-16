@@ -101,7 +101,7 @@ try {
     $details = 'results.php?test=' . $item['test_id'] . '&attempt=' . $item['id'];
 ?>
 <tr><th scope="row"><div class="result-student-name">
-<?php if ($item['quick_review'] && in_array($item['status'], ['pending_review', 'graded'], true)): ?>
+<?php if ($item['quick_review'] && in_array($item['status'], ['pending_review', 'graded', 'stopped'], true)): ?>
 <a class="quick-review-link" data-quick-link href="<?= e($details . '&quick=1') ?>" aria-label="Швидка перевірка: <?= e($item['title']) ?>" title="Швидка перевірка">✎</a>
 <?php endif ?>
 <a href="<?= e($details) ?>"><?= e($item['title']) ?></a></div></th>

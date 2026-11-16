@@ -63,7 +63,7 @@ if ($authorized) {
         }
         $students = query("SELECT s.id, s.login, s.full_name, s.class_id, c.grade, c.section, r.phone,
             s.birth_year,
-            (SELECT a.grade FROM attempts a WHERE a.student_id = s.id AND a.status = 'graded'
+            (SELECT a.grade FROM attempts a WHERE a.student_id = s.id AND a.grade IS NOT NULL
                 ORDER BY a.submitted_at DESC, a.id DESC LIMIT 1) AS latest_grade,
             (SELECT COUNT(*) FROM attempts a WHERE a.student_id = s.id) AS attempts,
             (SELECT COUNT(*) FROM attempts a WHERE a.student_id = s.id AND a.status IN ('pending_review','graded')) AS completed

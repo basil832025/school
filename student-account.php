@@ -194,7 +194,7 @@ pageStart('Кабінет учня', 'Кабінет учня', !$miniApp);
 <?php if ($row['submitted_at']): ?> · Завершення <?= e($row['submitted_at']) ?><?php endif ?></p>
 <p><?= match ($row['status']) {
     'started' => 'Розпочато',
-    'stopped' => 'Зупинено вчителем',
+    'stopped' => 'Зупинено вчителем' . ($row['grade'] !== null ? ' · Оцінка ' . e($row['grade']) . ' із 12' : ''),
     'pending_review' => 'Очікує перевірки вчителем',
     default => 'Оцінка ' . e($row['grade']) . ' із 12',
 } ?></p>

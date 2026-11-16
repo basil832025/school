@@ -13,14 +13,14 @@ function testQuestions(int $testId): array
 
 function finalizeAttempt(int $id): void
 {
-    query("UPDATE attempts a JOIN (
-        SELECT attempt_id, SUM(awarded_points) AS earned, COUNT(*) - COUNT(awarded_points) AS pending
-        FROM attempt_answers WHERE attempt_id = ? GROUP BY attempt_id
-    ) totals ON totals.attempt_id = a.id
+    query("UPDATE attempts a CROSS JOIN (
+        SELECT SUM(awarded_points) AS earned, COUNT(*) - COUNT(awarded_points) AS pending
+        FROM attempt_answers WHERE attempt_id = ?
+    ) totals
     SET a.earned_points = COALESCE(totals.earned, 0),
         a.grade = IF(totals.pending, NULL, GREATEST(1, ROUND(12 * COALESCE(totals.earned, 0) / a.max_points))),
-        a.status = IF(totals.pending, 'pending_review', 'graded'),
-        a.graded_at = IF(totals.pending, NULL, NOW())", [$id]);
+        a.status = IF(a.status = 'stopped', 'stopped', IF(totals.pending, 'pending_review', 'graded')),
+        a.graded_at = IF(totals.pending, NULL, NOW()) WHERE a.id = ?", [$id, $id]);
 }
 
 function studentNameParts(): array
