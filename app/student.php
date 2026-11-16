@@ -40,6 +40,15 @@ function studentName(): string
     return implode(' ', $parts);
 }
 
+function studentPhoneLogin(string $value): ?string
+{
+    $phone = preg_replace('/[\s().-]+/', '', $value);
+    if (preg_match('/^(?:\+?38)?(0[0-9]{9})$/D', $phone, $match)) {
+        return $match[1];
+    }
+    return preg_match('/^\+[1-9][0-9]{7,14}$/D', $phone) ? $phone : null;
+}
+
 function currentStudent(): ?array
 {
     if (empty($_SESSION['student_id'])) {

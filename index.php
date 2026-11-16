@@ -21,6 +21,13 @@ $miniApp = !empty($_SESSION['telegram_mini_app']);
 $registeredClass = null;
 try {
     $student = currentStudent();
+    if (!$student || empty($student['class_id'])) {
+        if ($autosave) {
+            http_response_code($student ? 409 : 401);
+            exit;
+        }
+        redirect('student-account.php' . ($testId > 0 && $classId > 0 ? '?test=' . $testId . '&class=' . $classId : ''));
+    }
     if (!empty($student['class_id'])) {
         $registeredClass = query('SELECT id, grade, section FROM classes WHERE id = ?', [$student['class_id']])->fetch();
     }
@@ -175,9 +182,7 @@ pageStart('Онлайн-тестування', 'Тестування учнів'
 <?php else: ?>
 <h2>Доступні тести</h2>
 <form class="filters" action="index.php#tests">
-<label>Клас <select name="filter_class"><option value="">Усі класи</option>
-<?php foreach ($classes as $id => $label): ?><option value="<?= $id ?>" <?= $filterClass === $id ? 'selected' : '' ?>><?= e($label) ?></option><?php endforeach ?>
-</select></label>
+<?php if ($registeredClass): ?><p><?= e(className($registeredClass)) ?></p><?php endif ?>
 <label>Предмет <select name="filter_subject"><option value="">Усі предмети</option>
 <?php foreach ($subjects as $id => $label): ?><option value="<?= $id ?>" <?= $filterSubject === $id ? 'selected' : '' ?>><?= e($label) ?></option><?php endforeach ?>
 </select></label><button>Показати</button>

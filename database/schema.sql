@@ -76,6 +76,7 @@ CREATE TABLE IF NOT EXISTS students (
  login VARCHAR(80) NOT NULL UNIQUE,
  password_hash VARCHAR(255) NOT NULL,
  full_name VARCHAR(150) NOT NULL,
+ birth_year SMALLINT UNSIGNED NULL,
  class_id INT UNSIGNED NULL,
  FOREIGN KEY (class_id) REFERENCES classes(id)
 ) ENGINE=InnoDB;
