@@ -9,4 +9,8 @@ section { margin: 16pt 0; break-inside: avoid; }
 .answer-lines { min-height: 48pt; border-top: 1px solid #bbb; border-bottom: 1px solid #bbb; margin-top: 12pt; }
 nav { border-bottom: 1px solid #bbb; margin-bottom: 18pt; padding-bottom: 10pt; }
 nav button { margin: 0 0 6pt 8pt; padding: 5pt 8pt; }
+.attempt-report-question, .attempt-report-summary { border-top: 1px solid #bbb; padding-top: 9pt; }
+.attempt-report-question { break-inside: auto; }
+.attempt-report-question p:first-of-type { break-after: avoid; }
+.attempt-report-summary p:last-child { margin-bottom: 0; }
 @media print { nav { display: none; } body { max-width: none; padding: 0; } }

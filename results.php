@@ -7,7 +7,8 @@ header('Cache-Control: no-store');
 
 $testId = (int) ($_GET['test'] ?? 0);
 $attemptId = (int) ($_GET['attempt'] ?? 0);
-$quickReview = $attemptId > 0 && ($_GET['quick'] ?? '') === '1';
+$printAttempt = $_SERVER['REQUEST_METHOD'] === 'GET' && $attemptId > 0 && ($_GET['print'] ?? '') === '1';
+$quickReview = !$printAttempt && $attemptId > 0 && ($_GET['quick'] ?? '') === '1';
 $confirmation = $_GET['confirm'] ?? '';
 $error = '';
 $notice = $_SESSION['results_notice'] ?? '';
@@ -47,7 +48,9 @@ try {
         throw new DomainException('Тест не знайдено.');
     }
     if ($attemptId) {
-        $attempt = query('SELECT * FROM attempts WHERE id = ? AND test_id = ?',
+        $attempt = query('SELECT a.*, c.grade AS class_grade, c.section,
+            TIMESTAMPDIFF(SECOND, a.started_at, a.submitted_at) AS duration
+            FROM attempts a JOIN classes c ON c.id = a.class_id WHERE a.id = ? AND a.test_id = ?',
             [$attemptId, $testId])->fetch();
         if (!$attempt) {
             http_response_code(404);
@@ -57,6 +60,17 @@ try {
         $answers = query("SELECT a.*, q.prompt, q.max_points, q.grading_guidance, q.type, q.position, q.image_url, q.image_size
             FROM attempt_answers a JOIN questions q ON q.id = a.question_id
             WHERE a.attempt_id = ?$answerFilter ORDER BY q.position", [$attemptId])->fetchAll();
+        if ($printAttempt) {
+            $reportQuestions = testQuestions($testId);
+            $reportAnswers = array_column($answers, null, 'question_id');
+            $selectedOptions = [];
+            foreach (query('SELECT aa.question_id, ao.option_id FROM attempt_answer_options ao
+                JOIN attempt_answers aa ON aa.id = ao.answer_id WHERE aa.attempt_id = ?', [$attemptId]) as $selection) {
+                $selectedOptions[$selection['question_id']][(int) $selection['option_id']] = true;
+            }
+            require __DIR__ . '/app/attempt_print.php';
+            exit;
+        }
         if (!$quickReview && $attempt['student_id'] && $attempt['status'] !== 'started' && $test['status'] === 'published') {
             $latest = query("SELECT id FROM attempts WHERE student_id = ? AND test_id = ?
                 ORDER BY (status = 'started') DESC, id DESC LIMIT 1",
@@ -214,6 +228,7 @@ pageStart('Результати учнів', 'Кабінет учителя', tr
 $detailsLink = 'results.php?test=' . $testId . '&attempt=' . $attemptId;
 $availableActions = attemptActions($attempt['status'], $canGrantRetake && !$retakeGranted);
 ?>
+<div class="toolbar"><a class="quiz-link" href="<?= e($detailsLink . '&print=1') ?>">Друк / PDF</a></div>
 <?php if (is_string($confirmation) && isset($availableActions[$confirmation])): ?>
 <div class="alert <?= $confirmation === 'delete' ? 'error' : 'success' ?>">
 <h3><?= e($availableActions[$confirmation]) ?>?</h3>
