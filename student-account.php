@@ -74,7 +74,7 @@ try {
             }
             $passwordHash = password_hash($password, PASSWORD_DEFAULT);
             query('INSERT INTO students (login, password_hash, full_name, class_id, birth_year) VALUES (?, ?, ?, ?, ?)',
-                [$phone, $passwordHash, studentName(), $profileClass, $birthYear]);
+                [$phone, $passwordHash, implode(' ', studentNameParts()), $profileClass, $birthYear]);
             $id = (int) db()->lastInsertId();
         } else {
             $account = query('SELECT id, password_hash FROM students WHERE login = ?', [$login])->fetch();
@@ -159,9 +159,10 @@ pageStart('Кабінет учня', 'Кабінет учня', !$miniApp);
 <button>Увійти</button></form></section>
 <section class="panel"><h2>Реєстрація</h2>
 <form method="post" class="stack"><?= csrf() ?><input type="hidden" name="action" value="register">
-<label>Прізвище, ім’я та по батькові<input name="student_name" autocomplete="name" maxlength="150" required
-    placeholder="Шевченко Олена" value="<?= e($_POST['student_name'] ?? '') ?>"></label>
-<p class="hint">Прізвище від 3 літер, ім’я від 2 літер. По батькові за бажанням.</p>
+<label>Прізвище<input name="surname" autocomplete="family-name" minlength="3" maxlength="75" required
+    placeholder="Шевченко" value="<?= e($_POST['surname'] ?? '') ?>"></label>
+<label>Ім’я<input name="first_name" autocomplete="given-name" minlength="2" maxlength="75" required
+    placeholder="Олена" value="<?= e($_POST['first_name'] ?? '') ?>"></label>
 <?php profileFields($classes); ?>
 <label>Телефон (логін)<input type="tel" name="login" autocomplete="tel" maxlength="32" required
     value="<?= ($_POST['action'] ?? '') === 'register' ? e($_POST['login'] ?? '') : '' ?>"></label>

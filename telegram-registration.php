@@ -3,6 +3,7 @@ declare(strict_types=1);
 define('STUDENT_SESSION', true);
 require __DIR__ . '/app/bootstrap.php';
 require __DIR__ . '/app/layout.php';
+require __DIR__ . '/app/student.php';
 require __DIR__ . '/app/telegram.php';
 header('Cache-Control: no-store');
 header('Referrer-Policy: no-referrer');

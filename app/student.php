@@ -23,21 +23,19 @@ function finalizeAttempt(int $id): void
         a.graded_at = IF(totals.pending, NULL, NOW())", [$id]);
 }
 
-function studentName(): string
+function studentNameParts(): array
 {
-    $name = textField('student_name', 150);
-    $parts = preg_split('/\s+/u', $name, -1, PREG_SPLIT_NO_EMPTY);
-    $word = '\p{L}+(?:[’ʼ\x{0027}-]\p{L}+)*';
-    if (!$parts || count($parts) < 2) {
-        throw new DomainException('Введи прізвище та ім’я через пробіл.');
+    $surname = textField('surname', 75);
+    $firstName = textField('first_name', 75);
+    $word = '/^\p{L}+(?:[’ʼ\x{0027}-]\p{L}+)*$/uD';
+    if (!preg_match($word, $surname) || preg_match_all('/\p{L}/u', $surname) < 3
+        || !preg_match($word, $firstName) || preg_match_all('/\p{L}/u', $firstName) < 2) {
+        throw new DomainException('Введи прізвище від 3 літер та ім’я від 2 літер.');
     }
-    foreach ($parts as $index => $part) {
-        $minimum = $index === 0 ? 3 : 2;
-        if (!preg_match('/^' . $word . '$/uD', $part) || preg_match_all('/\p{L}/u', $part) < $minimum) {
-            throw new DomainException('Прізвище має містити щонайменше 3 літери, ім’я та по батькові — щонайменше 2 літери кожне.');
-        }
+    if (mb_strlen($surname . ' ' . $firstName) > 150) {
+        throw new DomainException('Прізвище та ім’я разом мають містити до 150 символів.');
     }
-    return implode(' ', $parts);
+    return [$surname, $firstName];
 }
 
 function studentPhoneLogin(string $value): ?string

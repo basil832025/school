@@ -153,13 +153,7 @@ function telegramCompleteRegistration(int $telegramId): array
         throw new DomainException('Спочатку підтвердь свій номер у боті.');
     }
     if (!$profile['student_id']) {
-        $surname = textField('surname', 75);
-        $firstName = textField('first_name', 75);
-        $word = '/^\p{L}+(?:[’ʼ\x{0027}-]\p{L}+)*$/uD';
-        if (!preg_match($word, $surname) || preg_match_all('/\p{L}/u', $surname) < 3
-            || !preg_match($word, $firstName) || preg_match_all('/\p{L}/u', $firstName) < 2) {
-            throw new DomainException('Введи прізвище від 3 літер та ім’я від 2 літер.');
-        }
+        [$surname, $firstName] = studentNameParts();
         $classId = filter_var($_POST['class_id'] ?? '', FILTER_VALIDATE_INT);
         if (!$classId || !query('SELECT id FROM classes WHERE id = ?', [$classId])->fetchColumn()) {
             throw new DomainException('Обери клас зі списку.');
