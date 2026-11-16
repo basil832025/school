@@ -15,7 +15,7 @@ function questionImage(array $item, string $alt): void
 
 function teacherSections(): array
 {
-    return ['tests' => 'Мої тести', 'new' => 'Новий тест', 'classes' => 'Класи', 'subjects' => 'Предмети'];
+    return ['tests' => 'Мої тести', 'students' => 'Учні', 'new' => 'Новий тест', 'classes' => 'Класи', 'subjects' => 'Предмети'];
 }
 
 function testPoints(array $attempt): string

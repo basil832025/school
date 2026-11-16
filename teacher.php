@@ -79,7 +79,7 @@ if ($currentTeacher) {
                 $filters = [
                     'class' => max(0, (int) ($_GET['class'] ?? 0)),
                     'subject' => max(0, (int) ($_GET['subject'] ?? 0)),
-                    'sort' => ($_GET['sort'] ?? '') === 'oldest' ? 'oldest' : 'newest',
+                    'sort' => in_array($_GET['sort'] ?? '', ['oldest', 'last', 'first'], true) ? $_GET['sort'] : 'newest',
                 ];
             }
             $filterClass = $filters['class'] ?? 0;
@@ -100,14 +100,22 @@ if ($currentTeacher) {
             $pageCount = max(1, (int) ceil($totalTests / $pageSize));
             $page = min($pageCount, max(1, (int) ($_GET['page'] ?? $filters['page'] ?? 1)));
             $offset = ($page - 1) * $pageSize;
-            $direction = $sort === 'oldest' ? 'ASC' : 'DESC';
+            $activityFilter = $filterClass ? ' AND a.class_id = ?' : '';
+            $order = match ($sort) {
+                'last' => 'last_completion IS NULL, last_completion DESC, t.id DESC',
+                'first' => 'last_completion IS NULL, last_completion ASC, t.id DESC',
+                'oldest' => 't.created_at ASC, t.id ASC',
+                default => 't.created_at DESC, t.id DESC',
+            };
             $tests = query("SELECT t.id, t.title, t.status, t.created_at, s.name AS subject_name,
+                (SELECT MAX(a.submitted_at) FROM attempts a WHERE a.test_id = t.id
+                    AND a.status IN ('pending_review', 'graded')$activityFilter) AS last_completion,
                 (SELECT COUNT(*) FROM questions q WHERE q.test_id = t.id) AS question_count,
                 (SELECT GROUP_CONCAT(CONCAT(c.grade, IF(c.section = '', '', CONCAT('-', c.section)))
                     ORDER BY c.grade, c.section SEPARATOR ', ')
                     FROM test_classes tc JOIN classes c ON c.id = tc.class_id WHERE tc.test_id = t.id) AS class_names
                 FROM tests t JOIN subjects s ON s.id = t.subject_id WHERE $where
-                ORDER BY t.created_at $direction, t.id $direction LIMIT $pageSize OFFSET $offset", $params)->fetchAll();
+                ORDER BY $order LIMIT $pageSize OFFSET $offset", $filterClass ? [$filterClass, ...$params] : $params)->fetchAll();
             $_SESSION['teacher_test_list'] = ['class' => $filterClass, 'subject' => $filterSubject, 'sort' => $sort, 'page' => $page];
         }
         if ($testId) {
@@ -181,9 +189,11 @@ pageStart('Кабінет учителя', 'Кабінет учителя', true
 <label>Предмет<select name="subject"><option value="0">Усі предмети</option>
 <?php foreach ($subjects as $subject): ?><option value="<?= e($subject['id']) ?>" <?= $filterSubject === (int) $subject['id'] ? 'selected' : '' ?>><?= e($subject['name']) ?></option><?php endforeach ?>
 </select></label>
-<label>Дата додавання<select name="sort">
+<label>Сортування<select name="sort">
 <option value="newest" <?= $sort === 'newest' ? 'selected' : '' ?>>Спочатку нові</option>
 <option value="oldest" <?= $sort === 'oldest' ? 'selected' : '' ?>>Спочатку старі</option>
+<option value="last" <?= $sort === 'last' ? 'selected' : '' ?>>Останнє проходження ↓</option>
+<option value="first" <?= $sort === 'first' ? 'selected' : '' ?>>Останнє проходження ↑</option>
 </select></label>
 <button>Показати</button><a class="import-template" href="teacher.php?reset_filters=1">Скинути</a>
 </form>
@@ -192,7 +202,7 @@ pageStart('Кабінет учителя', 'Кабінет учителя', true
 <?php else: ?>
 <div class="results-scroll" tabindex="0" aria-label="Таблиця тестів">
 <table class="results-table teacher-tests-table">
-<thead><tr><th scope="col">Назва</th><th scope="col">Клас</th><th scope="col">Предмет</th><th scope="col">Запитань</th><th scope="col">Стан</th><th scope="col">Додано</th><th scope="col">Дії</th></tr></thead>
+<thead><tr><th scope="col">Назва</th><th scope="col">Клас</th><th scope="col">Предмет</th><th scope="col">Запитань</th><th scope="col">Стан</th><th scope="col">Додано</th><th scope="col">Останнє проходження</th><th scope="col">Дії</th></tr></thead>
 <tbody>
 <?php foreach ($tests as $item): ?>
 <tr>
@@ -202,6 +212,7 @@ pageStart('Кабінет учителя', 'Кабінет учителя', true
 <td><?= e($item['question_count']) ?></td>
 <td><span class="badge"><?= e($statuses[$item['status']]) ?></span></td>
 <td><?= $item['created_at'] ? e(date('d.m.Y H:i', strtotime($item['created_at']))) : '—' ?></td>
+<td><?= $item['last_completion'] ? e(date('d.m.Y H:i', strtotime($item['last_completion']))) : '—' ?></td>
 <td><?php if ($item['status'] !== 'draft'): ?><a href="results.php?test=<?= e($item['id']) ?>">Результати</a><?php else: ?><a href="teacher.php?test=<?= e($item['id']) ?>">Редагувати</a><?php endif ?></td>
 </tr>
 <?php endforeach ?>
@@ -218,6 +229,8 @@ pageStart('Кабінет учителя', 'Кабінет учителя', true
 <?php endif ?>
 <?php endif ?>
 </section>
+<?php elseif ($section === 'students'): ?>
+<?php require __DIR__ . '/app/teacher_students.php'; ?>
 <?php elseif ($section === 'new'): ?>
 <section class="panel question-editor"><h2>Новий тест</h2>
 <?php if (!$subjects || !$classes): ?><p class="hint">Спочатку додайте предмет і клас у відповідних вкладках.</p><?php endif ?>
