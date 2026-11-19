@@ -55,15 +55,9 @@ try {
         $login = textField('login', 80);
         $password = $_POST['password'] ?? '';
         if ($action === 'register') {
-            $phone = studentPhoneLogin($login);
-            if ($phone === null) {
-                throw new DomainException('Введи номер телефону, наприклад 0501234567 або +380501234567.');
-            }
             [$profileClass, $birthYear] = webStudentProfile();
-            if (query('SELECT id FROM students WHERE login IN (?, ?, ?) LIMIT 1',
-                [$phone, preg_match('/^0[0-9]{9}$/D', $phone) ? '+38' . $phone : $phone,
-                    preg_match('/^0[0-9]{9}$/D', $phone) ? '38' . $phone : $phone])->fetchColumn()) {
-                throw new DomainException('Цей номер уже використовується для входу.');
+            if (query('SELECT id FROM students WHERE login = ? LIMIT 1', [$login])->fetchColumn()) {
+                throw new DomainException('Цей логін уже використовується для входу.');
             }
             if (!is_string($password) || mb_strlen($password) < 8 || strlen($password) > 72
                 || trim($password) === '' || str_contains($password, "\0")) {
@@ -74,7 +68,7 @@ try {
             }
             $passwordHash = password_hash($password, PASSWORD_DEFAULT);
             query('INSERT INTO students (login, password_hash, full_name, class_id, birth_year) VALUES (?, ?, ?, ?, ?)',
-                [$phone, $passwordHash, implode(' ', studentNameParts()), $profileClass, $birthYear]);
+                [$login, $passwordHash, implode(' ', studentNameParts()), $profileClass, $birthYear]);
             $id = (int) db()->lastInsertId();
         } else {
             $account = query('SELECT id, password_hash FROM students WHERE login = ?', [$login])->fetch();
@@ -154,7 +148,7 @@ pageStart('Кабінет учня', 'Кабінет учня', !$miniApp);
 <div class="workspace">
 <section class="panel"><h2>Вхід</h2>
 <form method="post" class="stack"><?= csrf() ?><input type="hidden" name="action" value="login">
-<label>Телефон або наявний логін<input name="login" autocomplete="username" required maxlength="80"></label>
+<label>Логін або телефон<input name="login" autocomplete="username" required maxlength="80"></label>
 <label>Пароль<input name="password" type="password" autocomplete="current-password" required></label>
 <button>Увійти</button></form></section>
 <section class="panel"><h2>Реєстрація</h2>
@@ -164,7 +158,7 @@ pageStart('Кабінет учня', 'Кабінет учня', !$miniApp);
 <label>Ім’я<input name="first_name" autocomplete="given-name" minlength="2" maxlength="75" required
     placeholder="Олена" value="<?= e($_POST['first_name'] ?? '') ?>"></label>
 <?php profileFields($classes); ?>
-<label>Телефон (логін)<input type="tel" name="login" autocomplete="tel" maxlength="32" required
+<label>Логін або телефон<input type="text" name="login" autocomplete="username" maxlength="80" required
     value="<?= ($_POST['action'] ?? '') === 'register' ? e($_POST['login'] ?? '') : '' ?>"></label>
 <label>Пароль<input name="password" type="password" autocomplete="new-password" minlength="8" required></label>
 <label>Повтори пароль<input name="confirm_password" type="password" autocomplete="new-password" minlength="8" required></label>
