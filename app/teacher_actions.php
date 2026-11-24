@@ -20,9 +20,9 @@ function selectedClasses(): array
 
 function saveTestClasses(int $testId, array $classes): void
 {
-    query('DELETE FROM test_classes WHERE test_id = ?', [$testId]);
+    query('UPDATE test_classes SET is_active = 0 WHERE test_id = ?', [$testId]);
     foreach ($classes as $classId) {
-        query('INSERT INTO test_classes (test_id, class_id) VALUES (?, ?)', [$testId, $classId]);
+        query('INSERT INTO test_classes (test_id, class_id) VALUES (?, ?) ON DUPLICATE KEY UPDATE is_active = 1', [$testId, $classId]);
     }
 }
 
@@ -233,6 +233,8 @@ function teacherAction(array $teacher): never
                 query("UPDATE tests SET status = 'archived' WHERE id = ?", [$testId]);
             } elseif ($action === 'restore' && $test['status'] === 'archived') {
                 query("UPDATE tests SET status = 'published' WHERE id = ?", [$testId]);
+            } elseif ($action === 'save_classes') {
+                saveTestClasses($testId, selectedClasses());
             } else {
                 if ($test['status'] !== 'draft') {
                     throw new DomainException('Редагувати можна лише чернетки.');
@@ -305,7 +307,7 @@ function teacherAction(array $teacher): never
                         break;
                     case 'publish':
                         $questions = query('SELECT * FROM questions WHERE test_id = ?', [$testId])->fetchAll();
-                        if (!$questions || !query('SELECT class_id FROM test_classes WHERE test_id = ?', [$testId])->fetchColumn()) {
+                        if (!$questions || !query('SELECT class_id FROM test_classes WHERE test_id = ? AND is_active = 1', [$testId])->fetchColumn()) {
                             throw new DomainException('Для публікації додайте запитання й оберіть класи.');
                         }
                         foreach ($questions as $question) {

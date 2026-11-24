@@ -40,6 +40,7 @@ CREATE TABLE IF NOT EXISTS tests (
 CREATE TABLE IF NOT EXISTS test_classes (
  test_id INT UNSIGNED NOT NULL,
  class_id INT UNSIGNED NOT NULL,
+ is_active TINYINT(1) NOT NULL DEFAULT 1,
  PRIMARY KEY (test_id, class_id),
  FOREIGN KEY (test_id) REFERENCES tests(id),
  FOREIGN KEY (class_id) REFERENCES classes(id)

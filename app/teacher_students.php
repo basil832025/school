@@ -20,7 +20,7 @@ try {
     if ($studentId) {
         $profile = query("SELECT s.full_name FROM students s WHERE s.id = ? AND (
             EXISTS (SELECT 1 FROM test_classes tc JOIN tests t ON t.id = tc.test_id
-                WHERE t.teacher_id = ? AND tc.class_id = s.class_id)
+                WHERE tc.is_active = 1 AND t.teacher_id = ? AND tc.class_id = s.class_id)
             OR EXISTS (SELECT 1 FROM attempts a JOIN tests t ON t.id = a.test_id
                 WHERE t.teacher_id = ? AND a.student_id = s.id))", [$studentId, $teacherId, $teacherId])->fetch();
         if ($profile) {
@@ -45,7 +45,7 @@ try {
             WHERE (? = 0 OR s.class_id = ?) AND (
                 activity.total IS NOT NULL OR EXISTS (
                     SELECT 1 FROM test_classes tc JOIN tests t ON t.id = tc.test_id
-                    WHERE tc.class_id = s.class_id AND t.teacher_id = ? AND (? = 0 OR t.subject_id = ?)
+                    WHERE tc.is_active = 1 AND tc.class_id = s.class_id AND t.teacher_id = ? AND (? = 0 OR t.subject_id = ?)
                 )
             ) ORDER BY $order", [$teacherId, $subjectFilter, $subjectFilter, $classFilter, $classFilter,
                 $teacherId, $subjectFilter, $subjectFilter])->fetchAll();

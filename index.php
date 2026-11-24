@@ -82,7 +82,7 @@ try {
             ORDER BY (recent.status = 'started') DESC, recent.id DESC LIMIT 1
         )
         LEFT JOIN retake_permissions p ON p.student_id = ? AND p.test_id = t.id
-        WHERE t.status = 'published' AND (? = 0 OR c.id = ? OR (t.id = ? AND c.id = ?))
+        WHERE t.status = 'published' AND (tc.is_active = 1 OR (a.status = 'started' AND a.class_id = c.id)) AND (? = 0 OR c.id = ? OR (t.id = ? AND c.id = ?))
         ORDER BY c.grade, c.section, t.published_at DESC",
         [$student['id'] ?? null, $student['id'] ?? null, $restrictedClassId, $restrictedClassId,
             $attempt ? $testId : 0, $attempt ? $classId : 0])->fetchAll();

@@ -111,7 +111,7 @@ if ($currentTeacher) {
             $where = 't.teacher_id = ?';
             $params = [$currentTeacher['id']];
             if ($filterClass) {
-                $where .= ' AND EXISTS (SELECT 1 FROM test_classes tc WHERE tc.test_id = t.id AND tc.class_id = ?)';
+                $where .= ' AND EXISTS (SELECT 1 FROM test_classes tc WHERE tc.is_active = 1 AND tc.test_id = t.id AND tc.class_id = ?)';
                 $params[] = $filterClass;
             }
             if ($filterSubject) {
@@ -134,12 +134,12 @@ if ($currentTeacher) {
                     AND a.status IN ('pending_review', 'graded')$activityFilter) AS last_completion,
                 (SELECT COUNT(*) FROM questions q WHERE q.test_id = t.id) AS question_count,
                 (SELECT c.grade FROM test_classes tc JOIN classes c ON c.id = tc.class_id
-                    WHERE tc.test_id = t.id ORDER BY c.grade, c.section LIMIT 1) AS first_grade,
+                    WHERE tc.is_active = 1 AND tc.test_id = t.id ORDER BY c.grade, c.section LIMIT 1) AS first_grade,
                 (SELECT c.section FROM test_classes tc JOIN classes c ON c.id = tc.class_id
-                    WHERE tc.test_id = t.id ORDER BY c.grade, c.section LIMIT 1) AS first_section,
+                    WHERE tc.is_active = 1 AND tc.test_id = t.id ORDER BY c.grade, c.section LIMIT 1) AS first_section,
                 (SELECT GROUP_CONCAT(CONCAT(c.grade, IF(c.section = '', '', CONCAT('-', c.section)))
                     ORDER BY c.grade, c.section SEPARATOR ', ')
-                    FROM test_classes tc JOIN classes c ON c.id = tc.class_id WHERE tc.test_id = t.id) AS class_names
+                    FROM test_classes tc JOIN classes c ON c.id = tc.class_id WHERE tc.is_active = 1 AND tc.test_id = t.id) AS class_names
                 FROM tests t JOIN subjects s ON s.id = t.subject_id WHERE $where
                 ORDER BY $order, t.id DESC LIMIT $pageSize OFFSET $offset", $filterClass ? [$filterClass, ...$params] : $params)->fetchAll();
             $_SESSION['teacher_test_list'] = ['class' => $filterClass, 'subject' => $filterSubject, 'status' => $filterStatus,
@@ -151,7 +151,7 @@ if ($currentTeacher) {
                 http_response_code(404);
                 $error = 'Тест не знайдено або доступ відсутній.';
             } else {
-                $assigned = array_column(query('SELECT class_id FROM test_classes WHERE test_id = ?', [$testId])->fetchAll(), 'class_id');
+                $assigned = array_column(query('SELECT class_id FROM test_classes WHERE test_id = ? AND is_active = 1', [$testId])->fetchAll(), 'class_id');
                 $questions = query('SELECT * FROM questions WHERE test_id = ? ORDER BY position', [$testId])->fetchAll();
                 foreach ($questions as &$question) {
                     $question['options'] = query('SELECT * FROM question_options WHERE question_id = ? ORDER BY position', [$question['id']])->fetchAll();
@@ -327,8 +327,16 @@ pageStart('Кабінет учителя', 'Кабінет учителя', true
 </details>
 <?php else: ?>
 <p class="hint">Запитання та правильні відповіді зафіксовано.</p>
-<p>Класи
-<?php foreach ($classes as $class) { if (in_array($class['id'], $assigned)) { echo e(className($class)) . ' '; } } ?></p>
+<form method="post" class="stack">
+    <?= csrf() ?><input type="hidden" name="action" value="save_classes"><input type="hidden" name="test_id" value="<?= $testId ?>">
+    <fieldset><legend>Доступно для класів</legend>
+    <?php foreach ($classes as $class): ?>
+        <label><input type="checkbox" name="classes[]" value="<?= $class['id'] ?>" <?= in_array($class['id'], $assigned) ? 'checked' : '' ?>> <?= e(className($class)) ?></label>
+    <?php endforeach ?>
+    </fieldset>
+    <p class="hint">Можна змінювати класи після публікації. Результати та вже розпочаті спроби зберігаються.</p>
+    <button>Зберегти класи</button>
+</form>
 <?php if ($test['status'] === 'published'): ?>
 <details <?= ($_POST['action'] ?? '') === 'archive' ? 'open' : '' ?>>
     <summary>Перенести до архіву</summary>

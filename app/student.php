@@ -70,8 +70,10 @@ function startTest(int $testId, int $classId, array $student): never
             throw new DomainException('Цей тест недоступний для твого класу.');
         }
         $maximum = query("SELECT SUM(q.max_points) FROM tests t JOIN test_classes tc ON tc.test_id = t.id
-            JOIN questions q ON q.test_id = t.id WHERE t.id = ? AND tc.class_id = ? AND t.status = 'published'",
-            [$testId, $classId])->fetchColumn();
+            JOIN questions q ON q.test_id = t.id WHERE t.id = ? AND tc.class_id = ? AND t.status = 'published'
+            AND (tc.is_active = 1 OR EXISTS (SELECT 1 FROM attempts ongoing
+                WHERE ongoing.test_id = t.id AND ongoing.student_id = ? AND ongoing.status = 'started'))",
+            [$testId, $classId, $student['id']])->fetchColumn();
         if (!$maximum) {
             throw new DomainException('Цей тест зараз недоступний.');
         }
